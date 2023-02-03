@@ -8,8 +8,7 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-#include "liburing.h"
+#include <liburing.h>
 
 #define MAX_CONNECTIONS     4096
 #define BACKLOG             512
@@ -28,7 +27,7 @@ enum {
     PROV_BUF,
 };
 
-typedef struct conn_info {
+typedef struct _conn_info {
     __u32 fd;
     __u16 type;
     __u16 bid;
@@ -69,7 +68,8 @@ int get_socket(int portno)
     return sock_listen_fd;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     if (argc < 2) {
         printf("Please give a port number: ./io_uring_echo_server [port]\n");
         exit(0);
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     struct io_uring_params params;
     struct io_uring ring;
     memset(&params, 0, sizeof(params));
-    //params.flags |= ;
+    //params.flags |= IORING_SETUP_SQPOLL;
 
     if (io_uring_queue_init_params(2048, &ring, &params) < 0) {
         perror("io_uring_init_failed...\n");
@@ -165,9 +165,8 @@ int main(int argc, char *argv[]) {
             } else if (type == ACCEPT) {
                 int sock_conn_fd = cqe->res;
                 // only read when there is no error, >= 0
-                if (sock_conn_fd >= 0) {
+                if (sock_conn_fd >= 0)
                     add_socket_read(&ring, sock_conn_fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
-                }
 
                 // new connected client; read data from socket and re-add accept to monitor for new connections
                 add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
@@ -193,6 +192,8 @@ int main(int argc, char *argv[]) {
 
         io_uring_cq_advance(&ring, count);
     }
+
+    return 0;
 }
 
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags) {
