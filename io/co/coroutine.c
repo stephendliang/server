@@ -107,7 +107,7 @@ static void sc_co_begin(unsigned int entry_l, unsigned int entry_h, unsigned int
 
     sc_co_yield();
 
-    // NOTE: Returning from here will terminate the process.
+     NOTE: Returning from here will terminate the process.
 }
 
 static void sc_co_ctx_init(ScCoroutine* self, void* stack, size_t stack_size, ScCoEntry entry,
@@ -128,8 +128,8 @@ static void sc_co_ctx_init(ScCoroutine* self, void* stack, size_t stack_size, Sc
 
 static void sc_co_ctx_swap(ScCoCtx* dst, ScCoCtx* src)
 {
-    //assert(dst);
-    //assert(src);
+    assert(dst);
+    assert(src);
 
     A3_UNWRAPSD(swapcontext(&dst->ctx, &src->ctx));
 }
@@ -151,7 +151,7 @@ ScCoMain* sc_co_main_new(ScEventLoop* ev)
 
 void sc_co_main_free(ScCoMain* main)
 {
-    //assert(main);
+    assert(main);
     free(main);
 }
 
@@ -163,7 +163,7 @@ ScEventLoop* sc_co_main_event_loop(ScCoMain* main)
 
 void sc_co_main_pending_resume(ScCoMain* main)
 {
-    //assert(main);
+    assert(main);
     while (!A3_SLL_IS_EMPTY(&main->spawn_queue)) {
         ScCoroutine* co = A3_SLL_HEAD(&main->spawn_queue);
         A3_SLL_DEQUEUE(&main->spawn_queue, link);
@@ -174,14 +174,14 @@ void sc_co_main_pending_resume(ScCoMain* main)
 /*
 size_t sc_co_count(ScCoMain* main)
 {
-    //assert(main);
+    assert(main);
     return main->count;
 }*/
 
 ScCoroutine* sc_co_new(ScCoMain* main, ScCoEntry entry, void* data)
 {
-    //assert(main);
-    //assert(entry);
+    assert(main);
+    assert(entry);
 
     A3_UNWRAPNI(ScCoroutine*, ret, calloc(1, sizeof(*ret)));
     ret->parent = main;
@@ -200,8 +200,8 @@ ScCoroutine* sc_co_new(ScCoMain* main, ScCoEntry entry, void* data)
 
 ScCoroutine* sc_co_spawn(ScCoEntry entry, void* data)
 {
-    //assert(CURRENT);
-    //assert(entry);
+    assert(CURRENT);
+    assert(entry);
 
     ScCoroutine* ret = sc_co_new(CURRENT->parent, entry, data);
     A3_SLL_ENQUEUE(&CURRENT->parent->spawn_queue, ret, link);
@@ -211,21 +211,21 @@ ScCoroutine* sc_co_spawn(ScCoEntry entry, void* data)
 
 ssize_t sc_co_yield()
 {
-    //assert(CURRENT);
+    assert(CURRENT);
 
     ScCoroutine* self = CURRENT;
     CURRENT           = NULL;
 
     sc_co_ctx_swap(&self->ctx, &self->parent->ctx);
 
-    //assert(CURRENT);
-    //assert(CURRENT == self);
+    assert(CURRENT);
+    assert(CURRENT == self);
     return self->value;
 }
 
 static void sc_co_free(ScCoroutine* co)
 {
-    //assert(co);
+    assert(co);
 
 #if !defined(NDEBUG) && defined(SC_HAVE_VALGRIND)
     VALGRIND_STACK_DEREGISTER(co->vg_stack_id);
@@ -237,14 +237,14 @@ static void sc_co_free(ScCoroutine* co)
 
 ssize_t sc_co_resume(ScCoroutine* co, ssize_t param)
 {
-    //assert(co);
-    //assert(!CURRENT);
+    assert(co);
+    assert(!CURRENT);
 
     co->value = param;
     CURRENT   = co;
     sc_co_ctx_swap(&co->parent->ctx, &co->ctx);
 
-    //assert(!CURRENT);
+    assert(!CURRENT);
     ssize_t ret = co->value;
     if (co->done)
         sc_co_free(co);
@@ -254,8 +254,8 @@ ssize_t sc_co_resume(ScCoroutine* co, ssize_t param)
 
 void sc_co_defer_on(ScCoroutine* co, ScCoDeferredCb f, void* data)
 {
-    //assert(co);
-    //assert(f);
+    assert(co);
+    assert(f);
 
     A3_UNWRAPNI(ScCoDeferred*, def, calloc(1, sizeof(*def)));
     *def = (ScCoDeferred) {
