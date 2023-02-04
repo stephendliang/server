@@ -18,8 +18,6 @@ void print_sq_poll_kernel_thread_status() {
         printf("Kernel thread io_uring-sq is not running.\n");
 }
 
-//https://lore.kernel.org/all/4b44f4e1-c039-a6b6-711f-22952ce1abfb@kernel.dk/T/
-//https://makefiletutorial.com
 int start_sq_polling_ops(struct io_uring *ring) {
     int fds[2];
     char buff1[BUF_SIZE];
@@ -68,7 +66,7 @@ int start_sq_polling_ops(struct io_uring *ring) {
 
     io_uring_submit(ring);
 
-    for(int i = 0; i < 2; i++) {
+    for(int i = 0; i < 2; i ++) {
         int ret = io_uring_wait_cqe(ring, &cqe);
         if (ret < 0) {
             fprintf(stderr, "Error waiting for completion: %s\n",
