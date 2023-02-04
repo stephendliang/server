@@ -201,6 +201,8 @@ int main(int argc, char *argv[])
                 add_provide_buf(&ring, conn_i.bid, group_id);
                 // add a new read for the existing connection
                 add_socket_read(&ring, conn_i.fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+            } else if (type == SENDFILE) {
+                puts("lol sendfile");
             }
         }
 

@@ -13,5 +13,5 @@ liburing:
 	+$(MAKE) -C ./liburing
 
 io_uring_echo_server:
-	$(CC) server.c -o ./io_uring_echo_server  ${CCFLAGS}
+	$(CC) sqpoll.c -o ./io_uring_echo_server  ${CCFLAGS}
 	#$(CC) io_uring_echo_server.c -o ./io_uring_echo_server  ${CCFLAGS}
