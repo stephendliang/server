@@ -34,7 +34,6 @@ int start_sq_polling_ops(struct io_uring *ring) {
         perror("open");
         return 1;
     }
-
     memset(buff1, 0, BUF_SIZE);
     memset(buff2, 0, BUF_SIZE);
     memset(buff3, 0, BUF_SIZE);

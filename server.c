@@ -27,7 +27,6 @@ enum {
     SENDFILE,
     PROV_BUF,
 };
-
 typedef struct conn_info {
     __u32 fd;
     __u16 type;
@@ -223,7 +222,6 @@ void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, soc
     };
 
     sqe->user_data = *((uint64_t*)&conn_i);
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
 /*
@@ -269,7 +267,6 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
     };
 
     sqe->user_data = *((uint64_t*)&conn_i);
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags) {
@@ -284,7 +281,6 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
     };
 
     sqe->user_data = *((uint64_t*)&conn_i);
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid) {
@@ -297,5 +293,4 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid) {
     };
 
     sqe->user_data = *((uint64_t*)&conn_i);
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
