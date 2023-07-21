@@ -12,7 +12,7 @@
 
 #define MAX_CONNECTIONS     1024
 #define BACKLOG             512
-#define MAX_MESSAGE_LEN     1024
+#define MAX_MESSAGE_LEN     4096
 #define BUFFERS_COUNT       MAX_CONNECTIONS
 
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags);
@@ -27,14 +27,19 @@ enum {
     SENDFILE,
     PROV_BUF,
 };
+
 typedef struct conn_info {
     __u32 fd;
     __u16 type;
     __u16 bid;
 } conn_info;
 
+static struct io_uring ring;
+
 static char bufs[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
 int group_id = 1337;
+
+static char recvbuf[10000];
 
 int get_socket(int portno)
 {
@@ -66,6 +71,30 @@ int get_socket(int portno)
     return sock_listen_fd;
 }
 
+
+
+void setup_params(struct io_uring* ring)
+{
+    struct io_uring_params params;
+    memset(&params, 0, sizeof(params));
+    //params.flags |= IORING_SETUP_SQPOLL;
+    params.flags |= IORING_SETUP_DEFER_TASKRUN;
+    params.flags |= IORING_SETUP_SINGLE_ISSUER;
+
+    if (io_uring_queue_init_params(MAX_MESSAGE_LEN, ring, &params) < 0) {
+        perror("io_uring_init_failed...\n");
+        exit(1);
+    }
+
+    // check if IORING_FEAT_FAST_POLL is supported
+    if (!(params.features & IORING_FEAT_FAST_POLL)) {
+        printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+        exit(0);
+    }
+
+    puts("params done");
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -90,22 +119,7 @@ int main(int argc, char *argv[])
 
     // IO after this
     // initialize io_uring
-    struct io_uring_params params;
-    struct io_uring ring;
-    memset(&params, 0, sizeof(params));
-    //params.flags |= IORING_SETUP_SQPOLL;
-
-
-    if (io_uring_queue_init_params(MAX_MESSAGE_LEN, &ring, &params) < 0) {
-        perror("io_uring_init_failed...\n");
-        exit(1);
-    }
-
-    // check if IORING_FEAT_FAST_POLL is supported
-    if (!(params.features & IORING_FEAT_FAST_POLL)) {
-        printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
-        exit(0);
-    }
+    setup_params(&ring);
 
     // check if buffer selection is supported
     struct io_uring_probe *probe;
@@ -114,9 +128,6 @@ int main(int argc, char *argv[])
         printf("Buffer select not supported, skipping...\n");
         exit(0);
     }
-    free(probe);
-
-
 
     puts ("checked stats, now make rings");
 
@@ -187,11 +198,18 @@ int main(int argc, char *argv[])
                 int bytes_read = cqe->res;
                 int bid = cqe->flags >> 16;
                 if (cqe->res <= 0) {
+                    puts("failed");
+
                     // read failed, re-add the buffer
                     add_provide_buf(&ring, bid, group_id);
                     // connection closed or error
                     close(conn_i.fd);
                 } else {
+                    printf("%d\n",bytes_read);
+                    recvbuf[bytes_read]=0;
+                    puts("not failed");
+                    puts(recvbuf);
+
                     // bytes have been read into bufs, now add write to socket sqe
                     add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
                 }
@@ -221,7 +239,8 @@ void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, soc
         .type = ACCEPT,
     };
 
-    sqe->user_data = *((uint64_t*)&conn_i);
+    //sqe->user_data = *((uint64_t*)&conn_i);
+    memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
 /*
@@ -252,12 +271,12 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
     };
 
     sqe->user_data = *((uint64_t*)&conn_i);
+    memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 */
-
 void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message_size, unsigned flags) {
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-    io_uring_prep_recv(sqe, fd, NULL, message_size, 0);
+    io_uring_prep_recv(sqe, fd, recvbuf, message_size, 0);
     io_uring_sqe_set_flags(sqe, flags);
     sqe->buf_group = gid;
 
@@ -266,12 +285,21 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
         .type = READ,
     };
 
-    sqe->user_data = *((uint64_t*)&conn_i);
+    puts("read content");
+    recvbuf[message_size]=0;
+
+    //sqe->user_data = *((uint64_t*)&conn_i);
+    memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
+
+const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: Closed\r\nContent-Length: 10\r\n\r\nHello Baby";
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags) {
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-    io_uring_prep_send(sqe, fd, &bufs[bid], message_size, 0);
+    puts(bufs[bid]);
+    puts(sz);
+    //io_uring_prep_send(sqe, fd, &bufs[bid], message_size, 0);
+    io_uring_prep_send(sqe, fd, sz, strlen(sz), 0);
     io_uring_sqe_set_flags(sqe, flags);
 
     conn_info conn_i = {
@@ -280,7 +308,11 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
         .bid = bid,
     };
 
-    sqe->user_data = *((uint64_t*)&conn_i);
+    puts("write content");
+
+
+    //sqe->user_data = *((uint64_t*)&conn_i);
+    memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid) {
@@ -292,5 +324,6 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid) {
         .type = PROV_BUF,
     };
 
-    sqe->user_data = *((uint64_t*)&conn_i);
+    //sqe->user_data = *((uint64_t*)&conn_i);
+    memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }

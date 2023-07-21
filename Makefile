@@ -1,7 +1,7 @@
-CCFLAGS ?= -Wall -Ofast -D_GNU_SOURCE -luring
-all_targets = io_uring_echo_server
+CCFLAGS ?= -Wall -Werror -Wpedantic -Ofast -D_GNU_SOURCE -luring
+all_targets = io_uring_echo_server server sqpoll
 
-.PHONY: liburing sqpoll io_uring_echo_server
+.PHONY: liburing server sqpoll io_uring_echo_server
 
 all: $(all_targets)
 
@@ -10,6 +10,9 @@ clean:
 
 liburing:
 	+$(MAKE) -C ./liburing
+
+server:
+	$(CC) server.c -o ./server  ${CCFLAGS}
 
 sqpoll:
 	$(CC) sqpoll.c -o ./sqpoll  ${CCFLAGS}

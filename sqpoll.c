@@ -34,12 +34,13 @@ int start_sq_polling_ops(struct io_uring *ring) {
         perror("open");
         return 1;
     }
+
     memset(buff1, 0, BUF_SIZE);
     memset(buff2, 0, BUF_SIZE);
     memset(buff3, 0, BUF_SIZE);
     memset(buff4, 0, BUF_SIZE);
-    strncpy(buff1, STR1, str1_sz);
-    strncpy(buff2, STR2, str2_sz);
+    memcpy(buff1, STR1, str1_sz);
+    memcpy(buff2, STR2, str2_sz);
 
     int ret = io_uring_register_files(ring, fds, 1);
     if(ret) {
@@ -116,6 +117,8 @@ int start_sq_polling_ops(struct io_uring *ring) {
     }
     printf("Contents read from file:\n");
     printf("%s%s", buff3, buff4);
+
+    return 0;
 }
 
 int main() {
@@ -131,7 +134,7 @@ int main() {
 
     memset(&params, 0, sizeof(params));
     params.flags |= IORING_SETUP_SQPOLL;
-    params.sq_thread_idle = 2000;
+    params.sq_thread_idle = 9999000;
 
     int ret = io_uring_queue_init_params(8, &ring, &params);
     if (ret) {

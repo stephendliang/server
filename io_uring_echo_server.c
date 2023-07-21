@@ -34,6 +34,7 @@ typedef struct conn_info {
     __u16 bid;
 } conn_info;
 
+char readbuf[2048];
 char bufs[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
 int group_id = 1337;
 
@@ -92,7 +93,7 @@ int main(int argc, char *argv[]) {
         printf("Buffer select not supported, skipping...\n");
         exit(0);
     }
-    free(probe);
+    //free(probe);
 
     // register buffers for buffer selection
     struct io_uring_sqe *sqe;
@@ -148,11 +149,13 @@ int main(int argc, char *argv[]) {
                 int bytes_read = cqe->res;
                 int bid = cqe->flags >> 16;
                 if (cqe->res <= 0) {
+                puts("fail");
                     // read failed, re-add the buffer
                     add_provide_buf(&ring, bid, group_id);
                     // connection closed or error
                     close(conn_i.fd);
                 } else {
+                puts("succ");
                     // bytes have been read into bufs, now add write to socket sqe
                     add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
                 }
@@ -182,7 +185,7 @@ void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, soc
 
 void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message_size, unsigned flags) {
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-    io_uring_prep_recv(sqe, fd, NULL, message_size, 0);
+    io_uring_prep_recv(sqe, fd, readbuf, message_size, 0);
     io_uring_sqe_set_flags(sqe, flags);
     sqe->buf_group = gid;
 
