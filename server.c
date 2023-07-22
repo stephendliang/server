@@ -76,7 +76,7 @@ void setup_params(struct io_uring* ring)
 {
     struct io_uring_params params;
     memset(&params, 0, sizeof(params));
-    params.flags |= IORING_SETUP_IOPOLL;
+    //params.flags |= IORING_SETUP_IOPOLL;
     //params.flags |= IORING_SETUP_SQPOLL;
     params.flags |= IORING_SETUP_DEFER_TASKRUN;
     params.flags |= IORING_SETUP_SINGLE_ISSUER;
