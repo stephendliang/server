@@ -46,10 +46,33 @@ struct phr_header {
     size_t value_len;
 };
 
+struct defined_header {
+    const char *value;
+    size_t value_len;
+};
+
 struct http_request
 {
-    const char* authorization;
-    const char* authorization;
+    /*
+    const char *buf, size_t len, const char **method, size_t *method_len, const char **path, size_t *path_len,
+                      int *minor_version, struct phr_header *headers, size_t *num_headers, size_t last_len
+    */
+    const uint32_t version;
+    const uint32_t method;
+    uint32_t connection;
+    uint32_t headers;
+    uint32_t last_len;
+
+    struct defined_header path;
+    struct defined_header user_agent;
+    struct defined_header accept_language;
+    struct defined_header accept_encoding;
+    struct defined_header accept;
+    struct defined_header referrer;
+    struct defined_header authorization;
+    struct defined_header upgrade;
+
+    struct phr_header* headers;
 };
 
 /* returns number of bytes consumed if successful, -2 if request is partial,
@@ -57,6 +80,8 @@ struct http_request
 // parse http request
 int phr_parse_request(const char *buf, size_t len, const char **method, size_t *method_len, const char **path, size_t *path_len,
                       int *minor_version, struct phr_header *headers, size_t *num_headers, size_t last_len);
+
+int phr_parse_request(const char *buf, size_t len, struct http_request* hr, struct phr_header* headers);
 
 /* ditto */
 int phr_parse_response(const char *_buf, size_t len, int *minor_version, int *status, const char **msg, size_t *msg_len,

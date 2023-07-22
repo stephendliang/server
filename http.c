@@ -81,7 +81,7 @@
             if (*buf == ' ') {                                                                                                     \
                 break;                                                                                                             \
             } else if (unlikely(!IS_PRINTABLE_ASCII(*buf))) {                                                                      \
-                if ((unsigned char)*buf < '\040' || *buf == '\177') {                                                              \
+                if ((unsigned char)*buf < '\040' || *buf == '\177') {  /* < ' ' || * == 127*/                                      \
                     *ret = -1;                                                                                                     \
                     return NULL;                                                                                                   \
                 }                                                                                                                  \
@@ -422,6 +422,132 @@ int phr_parse_request(const char *buf_start, size_t len, const char **method, si
                              &r)) == NULL) {
         return r;
     }
+
+    return (int)(buf - buf_start);
+}
+
+int phr_parse_request(const char *buf_start, size_t len, struct http_request* hr)
+{
+    const char *buf = buf_start, *buf_end = buf_start + len;
+    size_t max_headers = *num_headers;
+    int r;
+
+    hr.method = NULL;
+    hr.path = NULL;
+    hr.path_len = 0;
+    hr.minor_version = -1;
+    hr.num_headers = 0;
+
+    /* if last_len != 0, check if the request is complete (a fast countermeasure
+       againt slowloris */
+    if (last_len != 0 && is_complete(buf, buf_end, last_len, &r) == NULL) {
+        return r;
+    }
+
+
+    // VERB
+    if (memcmp(hr, "GET ", 4) == 0) { method = METHOD_GET; }
+    else if (memcmp(hr, "POST ", 5) == 0) { method = METHOD_GET; }
+    else if (memcmp(hr, "PUT ", 4) == 0) { method = METHOD_GET; }
+    else if (memcmp(hr, "PATCH ", 6) == 0) { method = METHOD_GET; }
+    else if (memcmp(hr, "DELETE ", 7) == 0) { method = METHOD_GET; }
+    else if (memcmp(hr, "OPTIONS ", 8) == 0) { method = METHOD_GET; }
+    else {
+
+    }
+
+    // PATH
+    while (*p != ' ')
+        ++p;
+
+    if (*p == ' ') {
+        return -1;
+    }
+
+
+    // VERSION
+    parse_http_version();
+
+    if (*buf == '\015') {
+        ++buf;
+        EXPECT_CHAR('\012');
+    } else if (*buf == '\012') {
+        ++buf;
+    } else {
+        *ret = -1;
+        return NULL;
+    }
+
+    uint32_t num_headers = 0;
+
+
+    // check headers
+    {
+        for (;; ++num_headers) {
+            CHECK_EOF();
+            if (*buf == '\r') {
+                ++buf;
+                EXPECT_CHAR('\n');
+                break;
+            } else if (*buf == '\n') {
+                ++buf;
+                break;
+            }
+
+            if (num_headers == max_headers) {
+                *ret = -1;
+                return NULL;
+            }
+
+            if (!(num_headers != 0 && (*buf == ' ' || *buf == '\t'))) {
+                /* parsing name, but do not discard SP before colon, see
+                 * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
+                if ((buf = parse_token(buf, buf_end, &headers[num_headers].name, &headers[num_headers].name_len, ':', ret)) == NULL) {
+                    return NULL;
+                }
+                if (headers[num_headers].name_len == 0) {
+                    *ret = -1;
+                    return NULL;
+                }
+                ++buf;
+                for (;; ++buf) {
+                    CHECK_EOF();
+                    if (!(*buf == ' ' || *buf == '\t')) {
+                        break;
+                    }
+                }
+            } else {
+                headers[num_headers].name = NULL;
+                headers[num_headers].name_len = 0;
+            }
+
+            const char *value;
+            size_t value_len;
+            
+            if ((buf = get_token_to_eol(buf, buf_end, &value, &value_len, ret)) == NULL) {
+                return NULL;
+            }
+            
+            /* remove trailing SPs and HTABs */
+            const char *value_end = value + value_len;
+            for (; value_end != value; --value_end) {
+                const char c = *(value_end - 1);
+                if (!(c == ' ' || c == '\t')) {
+                    break;
+                }
+            }
+            
+            headers[num_headers].value = value;
+            headers[num_headers].value_len = value_end - value;
+        }
+        return buf;
+    }
+    
+
+
+
+    // HOST
+
 
     return (int)(buf - buf_start);
 }
