@@ -238,8 +238,8 @@ int main(int argc, char *argv[])
                     // connection closed or error
                     close(conn_i.fd);
                 } else {
-                    printf("%d\n",bytes_read);
-                    recvbuf[bytes_read]=0;
+                    //printf("%d\n",bytes_read);
+                    //recvbuf[bytes_read]=0;
 
                     // parse here, to decide if socket or sendfile
                     ////struct http_request req;
@@ -324,7 +324,7 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
         .type = READ,
     };
 
-    puts("read content");
+    //puts("read content");
     recvbuf[message_size]=0;
 
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
