@@ -47,7 +47,7 @@ int get_socket(int portno)
     struct sockaddr_in serv_addr;
 
     // setup socket
-    int sock_listen_fd = socket(AF_INET, SOCK_STREAM, O_DIRECT);
+    int sock_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     const int val = 1;
     setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
@@ -76,6 +76,7 @@ void setup_params(struct io_uring* ring)
 {
     struct io_uring_params params;
     memset(&params, 0, sizeof(params));
+    params.flags |= IORING_SETUP_IOPOLL;
     //params.flags |= IORING_SETUP_SQPOLL;
     params.flags |= IORING_SETUP_DEFER_TASKRUN;
     params.flags |= IORING_SETUP_SINGLE_ISSUER;
