@@ -47,7 +47,7 @@ int get_socket(int portno)
     struct sockaddr_in serv_addr;
 
     // setup socket
-    int sock_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int sock_listen_fd = socket(AF_INET, SOCK_STREAM, O_DIRECT);
     const int val = 1;
     setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
@@ -79,6 +79,7 @@ void setup_params(struct io_uring* ring)
     //params.flags |= IORING_SETUP_SQPOLL;
     params.flags |= IORING_SETUP_DEFER_TASKRUN;
     params.flags |= IORING_SETUP_SINGLE_ISSUER;
+    //params.sq_thread_idle = 9999000;
 
     if (io_uring_queue_init_params(MAX_MESSAGE_LEN, ring, &params) < 0) {
         perror("io_uring_init_failed...\n");
@@ -268,20 +269,6 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
-void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags) {
-    struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-    io_uring_prep_accept(sqe, fd, client_addr, client_len, 0);
-    io_uring_sqe_set_flags(sqe, flags);
-
-    conn_info conn_i = {
-        .fd = fd,
-        .type = ACCEPT,
-    };
-
-    memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
-}
-
 /*
 void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_socket, int64_t off_socket, int bytes) {
     //https://man7.org/linux/man-pages/man3/io_uring_prep_recv.3.html
@@ -313,7 +300,22 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
 }
 */
 
-void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message_size, unsigned flags) {
+void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags)
+{
+    struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
+    io_uring_prep_accept(sqe, fd, client_addr, client_len, 0);
+    io_uring_sqe_set_flags(sqe, flags);
+
+    conn_info conn_i = {
+        .fd = fd,
+        .type = ACCEPT,
+    };
+
+    memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
+}
+
+void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message_size, unsigned flags)
+{
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
     io_uring_prep_recv(sqe, fd, recvbuf, message_size, 0);
     io_uring_sqe_set_flags(sqe, flags);
@@ -332,7 +334,8 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
 
 const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: Closed\r\nContent-Length: 10\r\n\r\nHello Baby";
 
-void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags) {
+void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags)
+{
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
     //puts(bufs[bid]);
     //io_uring_prep_send(sqe, fd, &bufs[bid], message_size, 0);
@@ -351,7 +354,8 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
-void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid) {
+void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
+{
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
     io_uring_prep_provide_buffers(sqe, bufs[bid], MAX_MESSAGE_LEN, 1, gid, bid);
 
