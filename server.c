@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
                 int bytes_read = cqe->res;
                 int bid = cqe->flags >> 16;
                 if (cqe->res <= 0) {
-                    puts("failed");
+                    //puts("failed");
 
                     // read failed, re-add the buffer
                     add_provide_buf(&ring, bid, group_id);
@@ -334,7 +334,7 @@ const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: Closed\r\nC
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags) {
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-    puts(bufs[bid]);
+    //puts(bufs[bid]);
     //io_uring_prep_send(sqe, fd, &bufs[bid], message_size, 0);
 
     io_uring_prep_send(sqe, fd, sz, strlen(sz), 0);
@@ -346,7 +346,7 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
         .bid = bid,
     };
 
-    puts("write content");
+    //puts("write content");
 
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
