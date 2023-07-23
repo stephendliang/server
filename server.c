@@ -51,6 +51,9 @@ int get_socket(int portno)
     const int val = 1;
     setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
+    if (setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &val, sizeof(val)))
+        error(1, errno, "setsockopt zerocopy");
+
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(portno);
@@ -92,9 +95,11 @@ void setup_params(struct io_uring* ring)
         printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
         exit(0);
     }
-
-    puts("params done");
 }
+
+const char* s = "HTTP/1.1 101 Switching Protocols\r\n\
+Upgrade: websocket\r\n\
+Connection: Upgrade\r\nSec-WebSocket-Accept:";
 
 int main(int argc, char *argv[])
 {
@@ -271,7 +276,8 @@ int main(int argc, char *argv[])
     return 0;
 }
 /*
-void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_socket, int64_t off_socket, int bytes) {
+void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_socket, int64_t off_socket, int bytes)
+{
     //https://man7.org/linux/man-pages/man3/io_uring_prep_recv.3.html
 
     io_uring_push_send((struct io_uring *)conn->svr->ring, conn->fd,
@@ -285,6 +291,16 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
     io_uring_push_splice((struct io_uring *)conn->svr->ring,
                          conn->svr->pipefds[0], -1, conn->fd, -1,
                          res.file_sz, (void *)conn, 0);
+
+
+    io_uring_prep_splice(struct io_uring_sqe *sqe,
+                         int fd_in,
+                         int64_t off_in,
+                         int fd_out,
+                         int64_t off_out,
+                         unsigned int nbytes,
+                         unsigned int splice_flags);
+
 
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
     io_uring_prep_splice(sqe, fd_file, off_file, fd_socket, off_socket, bytes, // num bytes for file to send
@@ -341,7 +357,7 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
     //puts(bufs[bid]);
     //io_uring_prep_send(sqe, fd, &bufs[bid], message_size, 0);
 
-    io_uring_prep_send(sqe, fd, sz, strlen(sz), 0);
+    io_uring_prep_send(sqe, fd, sz, strlen(sz), MSG_ZEROCOPY);
     io_uring_sqe_set_flags(sqe, flags);
 
     conn_info conn_i = {

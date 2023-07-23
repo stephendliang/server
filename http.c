@@ -178,11 +178,11 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
         }
     }
 FOUND_CTL:
-    if (likely(*buf == '\015')) {
+    if (likely(*buf == '\r')) {
         ++buf;
-        EXPECT_CHAR('\012');
+        EXPECT_CHAR('\n');
         *token_len = buf - 2 - token_start;
-    } else if (*buf == '\012') {
+    } else if (*buf == '\n') {
         *token_len = buf - token_start;
         ++buf;
     } else {
@@ -201,12 +201,12 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
 
     while (1) {
         CHECK_EOF();
-        if (*buf == '\015') {
+        if (*buf == '\r') {
             ++buf;
             CHECK_EOF();
-            EXPECT_CHAR('\012');
+            EXPECT_CHAR('\n');
             ++ret_cnt;
-        } else if (*buf == '\012') {
+        } else if (*buf == '\n') {
             ++buf;
             ++ret_cnt;
         } else {
@@ -284,14 +284,13 @@ static const char *parse_http_version(const char *buf, const char *buf_end, int 
         *ret = -2;
         return NULL;
     }
-    EXPECT_CHAR_NO_CHECK('H');
-    EXPECT_CHAR_NO_CHECK('T');
-    EXPECT_CHAR_NO_CHECK('T');
-    EXPECT_CHAR_NO_CHECK('P');
-    EXPECT_CHAR_NO_CHECK('/');
-    EXPECT_CHAR_NO_CHECK('1');
-    EXPECT_CHAR_NO_CHECK('.');
-    PARSE_INT(minor_version, 1);
+    if (memcmp(buf, "HTTP/1.", 7) == 0) {
+
+    }
+
+    if (*buf - '0')
+        return buf;
+    //PARSE_INT(minor_version, 1);
     return buf;
 }
 
@@ -300,18 +299,20 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
 {
     for (;; ++*num_headers) {
         CHECK_EOF();
-        if (*buf == '\015') {
+        if (*buf == '\r') {
             ++buf;
-            EXPECT_CHAR('\012');
+            EXPECT_CHAR('\n');
             break;
-        } else if (*buf == '\012') {
+        } else if (*buf == '\n') {
             ++buf;
             break;
         }
+
         if (*num_headers == max_headers) {
             *ret = -1;
             return NULL;
         }
+
         if (!(*num_headers != 0 && (*buf == ' ' || *buf == '\t'))) {
             /* parsing name, but do not discard SP before colon, see
              * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
@@ -358,10 +359,10 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
 {
     /* skip first empty line (some clients add CRLF after POST content) */
     CHECK_EOF();
-    if (*buf == '\015') {
+    if (*buf == '\r') {
         ++buf;
-        EXPECT_CHAR('\012');
-    } else if (*buf == '\012') {
+        EXPECT_CHAR('\n');
+    } else if (*buf == '\n') {
         ++buf;
     }
 
@@ -398,34 +399,6 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret);
 }
 
-int phr_parse_request(const char *buf_start, size_t len, const char **method, size_t *method_len, const char **path,
-                      size_t *path_len, int *minor_version, struct phr_header *headers, size_t *num_headers, size_t last_len)
-{
-    const char *buf = buf_start, *buf_end = buf_start + len;
-    size_t max_headers = *num_headers;
-    int r;
-
-    *method = NULL;
-    *method_len = 0;
-    *path = NULL;
-    *path_len = 0;
-    *minor_version = -1;
-    *num_headers = 0;
-
-    /* if last_len != 0, check if the request is complete (a fast countermeasure
-       againt slowloris */
-    if (last_len != 0 && is_complete(buf, buf_end, last_len, &r) == NULL) {
-        return r;
-    }
-
-    if ((buf = parse_request(buf, buf_end, method, method_len, path, path_len, minor_version, headers, num_headers, max_headers,
-                             &r)) == NULL) {
-        return r;
-    }
-
-    return (int)(buf - buf_start);
-}
-
 int phr_parse_request(const char *buf_start, size_t len, struct http_request* hr)
 {
     const char *buf = buf_start, *buf_end = buf_start + len;
@@ -447,13 +420,13 @@ int phr_parse_request(const char *buf_start, size_t len, struct http_request* hr
 
     // VERB
     if (memcmp(hr, "GET ", 4) == 0) { method = METHOD_GET; }
-    else if (memcmp(hr, "POST ", 5) == 0) { method = METHOD_GET; }
-    else if (memcmp(hr, "PUT ", 4) == 0) { method = METHOD_GET; }
-    else if (memcmp(hr, "PATCH ", 6) == 0) { method = METHOD_GET; }
-    else if (memcmp(hr, "DELETE ", 7) == 0) { method = METHOD_GET; }
-    else if (memcmp(hr, "OPTIONS ", 8) == 0) { method = METHOD_GET; }
+    else if (memcmp(hr, "POST ", 5) == 0) { method = METHOD_POST; }
+    else if (memcmp(hr, "PUT ", 4) == 0) { method = METHOD_PUT; }
+    else if (memcmp(hr, "PATCH ", 6) == 0) { method = METHOD_PATCH; }
+    else if (memcmp(hr, "DELETE ", 7) == 0) { method = METHOD_DELETE; }
+    else if (memcmp(hr, "OPTIONS ", 8) == 0) { method = METHOD_OPTIONS; }
     else {
-
+        return -1;
     }
 
     // PATH
@@ -468,10 +441,10 @@ int phr_parse_request(const char *buf_start, size_t len, struct http_request* hr
     // VERSION
     parse_http_version();
 
-    if (*buf == '\015') {
+    if (*buf == '\r') {
         ++buf;
-        EXPECT_CHAR('\012');
-    } else if (*buf == '\012') {
+        EXPECT_CHAR('\n');
+    } else if (*buf == '\n') {
         ++buf;
     } else {
         *ret = -1;
