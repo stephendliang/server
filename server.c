@@ -52,7 +52,7 @@ int get_socket(int portno)
     setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
     if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_ZEROCOPY, &val, sizeof(val)))
-        perror(1, errno, "setsockopt zerocopy");
+        perror("setsockopt zerocopy");
 
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
