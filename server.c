@@ -367,7 +367,8 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
     };
 
     //puts("write content");
-
+    
+    //io_uring_submit_and_wait_timeout();
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
