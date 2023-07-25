@@ -105,39 +105,23 @@ int main(int argc, char *argv[])
 {
 
 /*
-    (void)argv;
-
-    a3_log_init(stderr, CONFIG.log_level);
-    config_parse(argc, argv);
-    // Re-initialize with the potentially changed log level.
-    a3_log_init(stderr, CONFIG.log_level);
-
-    srand((uint32_t)time(NULL));
-
-    webroot_check_exists(CONFIG.web_root);
-    http_connection_pool_init();
-    file_cache_init();
-    connection_timeout_init();
-    struct io_uring uring = event_init();
 
     {
-        Listener* listeners   = NULL;
-        size_t    n_listeners = 0;
+        a3_log_init(stderr, A3_LOG_TRACE);
 
-        // TODO: Support multiple listeners.
-        n_listeners = 1;
-        A3_UNWRAPN(listeners, calloc(1, sizeof(Listener)));
-        listener_init(&listeners[0], CONFIG.listen_port, TRANSPORT_PLAIN);
+        ScEventLoop* ev = sc_io_event_loop_new();
+        ScCoMain*    co = sc_co_main_new(ev);
 
-        listener_accept_all(listeners, n_listeners, &uring);
-        A3_UNWRAPND(io_uring_submit(&uring));
+        ScListener* listener =
+            sc_listener_http_new(SC_DEFAULT_LISTEN_PORT, sc_http_handle_file_serve(A3_CS(".")), ev);
+        sc_listener_start(listener, co);
 
-        A3_UNWRAPND(signal(SIGINT, sigint_handle) != SIG_ERR);
-        A3_UNWRAPND(signal(SIGPIPE, SIG_IGN) != SIG_ERR);
-        A3_TRACE("Entering event loop.");
+        sc_io_event_loop_run(co);
+
+        sc_listener_free(listener);
+        sc_io_event_loop_free(ev);
+        sc_co_main_free(co);
     }
-
-
 */
 
 
@@ -367,7 +351,7 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
     };
 
     //puts("write content");
-    
+
     //io_uring_submit_and_wait_timeout();
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
