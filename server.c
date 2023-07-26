@@ -23,8 +23,8 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid);
 
 enum {
     ACCEPT,
-    READ,
-    WRITE,
+    RECV,
+    SEND,
     SENDFILE,
     PROV_BUF,
 };
@@ -34,6 +34,8 @@ typedef struct conn_info {
     __u16 type;
     __u16 bid;
 } conn_info;
+
+#define CREATE_CQE_INFO(fd, type, bid) (((uint64_t)fd << 32) | ((uint64_t)type << 16) | bid)
 
 static struct io_uring ring;
 
@@ -201,22 +203,11 @@ int main(int argc, char *argv[])
             int type = conn_i.type;
             if (cqe->res != -ENOBUFS) {
                 if (type == PROV_BUF) {
-                    puts("PROV_BUF");
                     if (cqe->res < 0) {
                         printf("cqe->res = %d\n", cqe->res);
                         exit(1);
                     }
-                } else if (type == ACCEPT) {
-                    int sock_conn_fd = cqe->res;
-
-                    // only read the future data when there is no error, >= 0
-                    if (sock_conn_fd >= 0)
-                        add_socket_read(&ring, sock_conn_fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
-
-                    // new connected client; read data from socket and re-add accept to monitor for new connections
-                    // ALSO ACCEPT NEW CONNECTIONS FROM MORE CLIENTS
-                    add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
-                } else if (type == READ) {
+                } else if (type == RECV) {
                     int bytes_read = cqe->res;
                     int bid = cqe->flags >> 16;
                     if (cqe->res <= 0) {
@@ -242,11 +233,21 @@ int main(int argc, char *argv[])
                             ////add_socket_sendfile(&ring,);
                         }
                     }
-                } else if (type == WRITE) {
+                } else if (type == SEND) {
                     // write has been completed, first re-add the buffer
                     add_provide_buf(&ring, conn_i.bid, group_id);
                     // add a new read for the existing connection
                     add_socket_read(&ring, conn_i.fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+                } else if (type == ACCEPT) {
+                    int sock_conn_fd = cqe->res;
+
+                    // only read the future data when there is no error, >= 0
+                    if (sock_conn_fd >= 0)
+                        add_socket_read(&ring, sock_conn_fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+
+                    // new connected client; read data from socket and re-add accept to monitor for new connections
+                    // ALSO ACCEPT NEW CONNECTIONS FROM MORE CLIENTS
+                    add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
                 } else if (type == SENDFILE) {
                     puts("lol sendfile");
                 }
@@ -254,7 +255,6 @@ int main(int argc, char *argv[])
                 fprintf(stdout, "bufs in automatic buffer selection empty, this should not happen...\n");
                 fflush(stdout);
                 exit(1);
-
             }
         }
 
@@ -317,6 +317,7 @@ void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, soc
     };
 
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
+    //sqe->user_data = CREATE_CQE_INFO(fd, ACCEPT, 0);
 }
 
 void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message_size, unsigned flags)
@@ -328,13 +329,14 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
 
     conn_info conn_i = {
         .fd = fd,
-        .type = READ,
+        .type = RECV,
     };
 
     //puts("read content");
     recvbuf[message_size]=0;
 
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
+    //sqe->user_data = CREATE_CQE_INFO(fd, RECV, 0);
 }
 
 const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: Closed\r\nContent-Length: 10\r\n\r\nHello Baby";
@@ -350,7 +352,7 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
 
     conn_info conn_i = {
         .fd = fd,
-        .type = WRITE,
+        .type = SEND,
         .bid = bid,
     };
 
@@ -358,6 +360,7 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
 
     //io_uring_submit_and_wait_timeout();
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
+    //sqe->user_data = CREATE_CQE_INFO(fd, SEND, bid);
 }
 
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
@@ -371,4 +374,5 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
     };
 
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
+    //sqe->user_data = CREATE_CQE_INFO(fd, PROV_BUF, 0);
 }
