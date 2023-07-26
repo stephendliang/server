@@ -199,58 +199,62 @@ int main(int argc, char *argv[])
             memcpy(&conn_i, &cqe->user_data, sizeof(conn_i));
 
             int type = conn_i.type;
-            if (cqe->res == -ENOBUFS) {
+            if (cqe->res != -ENOBUFS) {
+                if (type == PROV_BUF) {
+                    puts("PROV_BUF");
+                    if (cqe->res < 0) {
+                        printf("cqe->res = %d\n", cqe->res);
+                        exit(1);
+                    }
+                } else if (type == ACCEPT) {
+                    int sock_conn_fd = cqe->res;
+
+                    // only read the future data when there is no error, >= 0
+                    if (sock_conn_fd >= 0)
+                        add_socket_read(&ring, sock_conn_fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+
+                    // new connected client; read data from socket and re-add accept to monitor for new connections
+                    // ALSO ACCEPT NEW CONNECTIONS FROM MORE CLIENTS
+                    add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
+                } else if (type == READ) {
+                    int bytes_read = cqe->res;
+                    int bid = cqe->flags >> 16;
+                    if (cqe->res <= 0) {
+                        //puts("failed");
+
+                        // read failed, re-add the buffer
+                        add_provide_buf(&ring, bid, group_id);
+                        // connection closed or error
+                        close(conn_i.fd);
+                    } else {
+                        //printf("%d\n",bytes_read);
+                        //recvbuf[bytes_read]=0;
+
+                        // parse here, to decide if socket or sendfile
+                        ////struct http_request req;
+                        ////struct phr_http_header hdrs[64];
+
+                        if (true) {
+                            // bytes have been read into bufs, now add write to socket sqe
+                            add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
+                        } else {
+                            // possibly [if there is a file requested]
+                            ////add_socket_sendfile(&ring,);
+                        }
+                    }
+                } else if (type == WRITE) {
+                    // write has been completed, first re-add the buffer
+                    add_provide_buf(&ring, conn_i.bid, group_id);
+                    // add a new read for the existing connection
+                    add_socket_read(&ring, conn_i.fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+                } else if (type == SENDFILE) {
+                    puts("lol sendfile");
+                }
+            } else {
                 fprintf(stdout, "bufs in automatic buffer selection empty, this should not happen...\n");
                 fflush(stdout);
                 exit(1);
-            } else if (type == PROV_BUF) {
-                if (cqe->res < 0) {
-                    printf("cqe->res = %d\n", cqe->res);
-                    exit(1);
-                }
-            } else if (type == ACCEPT) {
-                int sock_conn_fd = cqe->res;
 
-                // only read the future data when there is no error, >= 0
-                if (sock_conn_fd >= 0)
-                    add_socket_read(&ring, sock_conn_fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
-
-                // new connected client; read data from socket and re-add accept to monitor for new connections
-                // ALSO ACCEPT NEW CONNECTIONS FROM MORE CLIENTS
-                add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
-            } else if (type == READ) {
-                int bytes_read = cqe->res;
-                int bid = cqe->flags >> 16;
-                if (cqe->res <= 0) {
-                    //puts("failed");
-
-                    // read failed, re-add the buffer
-                    add_provide_buf(&ring, bid, group_id);
-                    // connection closed or error
-                    close(conn_i.fd);
-                } else {
-                    //printf("%d\n",bytes_read);
-                    //recvbuf[bytes_read]=0;
-
-                    // parse here, to decide if socket or sendfile
-                    ////struct http_request req;
-                    ////struct phr_http_header hdrs[64];
-
-                    if (true) {
-                        // bytes have been read into bufs, now add write to socket sqe
-                        add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
-                    } else {
-                        // possibly [if there is a file requested]
-                        ////add_socket_sendfile(&ring,);
-                    }
-                }
-            } else if (type == WRITE) {
-                // write has been completed, first re-add the buffer
-                add_provide_buf(&ring, conn_i.bid, group_id);
-                // add a new read for the existing connection
-                add_socket_read(&ring, conn_i.fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
-            } else if (type == SENDFILE) {
-                puts("lol sendfile");
             }
         }
 
