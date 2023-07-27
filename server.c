@@ -55,9 +55,6 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t size, u
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t size, unsigned flags);
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid);
 
-#define likely(x)       __builtin_expect((x),1)
-#define unlikely(x)     __builtin_expect((x),0)
-
 enum {
     ACCEPT,
     RECV,
@@ -76,7 +73,8 @@ typedef struct conn_info {
 #define EXTRACT_FD(cqe_data) (cqe_data >> 32)
 #define EXTRACT_BID(cqe_data) ((cqe_data >> 16) & 0xFFFF)
 #define EXTRACT_TYPE(cqe_data) (cqe_data & 0xFFFF)
-
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
 static struct io_uring ring;
 
 static uint8_t recvbuf[10000];
@@ -387,7 +385,7 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
     sqe->user_data = CREATE_CQE_INFO(fd, 0, RECV);
 }
 
-const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: close\r\nContent-Length: 10\r\n\r\nHello Baby";
+const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: keep-alive\r\nContent-Length: 10\r\n\r\nHello Baby";
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags)
 {
