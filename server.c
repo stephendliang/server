@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 
     // NETWORK only
     // some variables we need
-    int portno = 8090;//strtol(argv[1], NULL, 10);
+    int portno = 8888;//strtol(argv[1], NULL, 10);
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     int sock_listen_fd = get_socket(portno);
