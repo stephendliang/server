@@ -36,9 +36,9 @@ typedef struct conn_info {
 } conn_info;
 
 #define CREATE_CQE_INFO(fd, bid, type) (((uint64_t)fd << 32) | ((uint64_t)bid << 16) | type)
-#define EXTRACT_FD(cqe_info) (cqe_info >> 32)
-#define EXTRACT_BID(cqe_info) ((cqe_info >> 16) & 0xFFFF)
-#define EXTRACT_TYPE(cqe_info) (cqe_info & 0xFFFF)
+#define EXTRACT_FD(cqe_data) (cqe_data >> 32)
+#define EXTRACT_BID(cqe_data) ((cqe_data >> 16) & 0xFFFF)
+#define EXTRACT_TYPE(cqe_data) (cqe_data & 0xFFFF)
 
 static struct io_uring ring;
 
@@ -230,8 +230,8 @@ int main(int argc, char *argv[])
             //memcpy(&conn_i, &cqe->user_data, sizeof(conn_i));
             uint64_t cqe_data = cqe->user_data;
 
-            int cfd = EXTRACT_FD(cqe_data);
-            int ctype = EXTRACT_TYPE(cqe_data);
+            uint64_t cfd = EXTRACT_FD(cqe_data);
+            uint64_t ctype = EXTRACT_TYPE(cqe_data);
 
             if (cqe->res != -ENOBUFS) {
                 if (ctype == PROV_BUF) {
