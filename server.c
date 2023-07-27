@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
                         // connection closed or error
                         close(conn_i.fd);
                     } else {
-                        printf("%d\n",bytes_read);
+                        //printf("%d\n",bytes_read);
                         //recvbuf[bytes_read]=0;
 
                         // parse here, to decide if socket or sendfile
