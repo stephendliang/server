@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
 {
     // NETWORK only
     // some variables we need
-    int portno = 8888;//strtol(argv[1], NULL, 10);
+    int portno = 9999;//strtol(argv[1], NULL, 10);
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     int sock_listen_fd = get_socket(portno);
@@ -334,15 +334,8 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
     io_uring_sqe_set_flags(sqe, flags);
     sqe->buf_group = gid;
 
-/*
-    conn_info conn_i = {
-        .fd = fd,
-        .type = RECV,
-    };
-*/
     recvbuf[message_size] = 0;
 
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
     sqe->user_data = CREATE_CQE_INFO(fd, 0, RECV);
 }
 
@@ -372,7 +365,6 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
 void add_socket_close(struct io_uring *ring, int fd)
 {
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-
     io_uring_prep_close(sqe, fd);
 
     sqe->user_data = CREATE_CQE_INFO(fd, 0, CLOSE);

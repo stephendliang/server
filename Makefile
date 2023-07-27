@@ -1,7 +1,7 @@
 CCFLAGS ?= -Wall -Werror -Wpedantic -Ofast -D_GNU_SOURCE -luring
-all_targets = io_uring_echo_server server sqpoll
+all_targets = io_uring_echo_server server server2 sqpoll
 
-.PHONY: liburing server sqpoll io_uring_echo_server
+.PHONY: liburing server server2 sqpoll io_uring_echo_server
 
 all: $(all_targets)
 
@@ -13,6 +13,9 @@ liburing:
 
 server:
 	$(CC) server.c -o ./server  ${CCFLAGS}
+
+server2:
+	$(CC) server2.c -o ./server2  ${CCFLAGS}
 
 sqpoll:
 	$(CC) sqpoll.c -o ./sqpoll  ${CCFLAGS}
