@@ -55,6 +55,9 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t size, u
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t size, unsigned flags);
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid);
 
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
 enum {
     ACCEPT,
     RECV,
@@ -118,10 +121,9 @@ void setup_params(struct io_uring* ring)
 {
     struct io_uring_params params;
     memset(&params, 0, sizeof(params));
-    //params.flags |= IORING_SETUP_IOPOLL;
-    //params.flags |= IORING_SETUP_SQPOLL;
     params.flags |= IORING_SETUP_DEFER_TASKRUN;
     params.flags |= IORING_SETUP_SINGLE_ISSUER;
+    //params.flags |= IORING_SETUP_SQPOLL;
     //params.sq_thread_idle = 9999000;
 
     if (io_uring_queue_init_params(MAX_MESSAGE_LEN, ring, &params) < 0) {
@@ -238,7 +240,7 @@ int main(int argc, char *argv[])
 
             if (cqe->res != -ENOBUFS) {
                 if (ctype == PROV_BUF) {
-                    if (cqe->res < 0) {
+                    if (unlikely(cqe->res < 0)) {
                         printf("cqe->res = %d\n", cqe->res);
                         exit(1);
                     }
@@ -294,8 +296,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        //if (count)
-            io_uring_cq_advance(&ring, count);
+        io_uring_cq_advance(&ring, count);
     }
 
     return 0;
@@ -386,7 +387,7 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
     sqe->user_data = CREATE_CQE_INFO(fd, 0, RECV);
 }
 
-const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: keep-alive\r\nContent-Length: 10\r\n\r\nHello Baby";
+const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: close\r\nContent-Length: 10\r\n\r\nHello Baby";
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags)
 {
