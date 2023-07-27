@@ -61,6 +61,7 @@ enum {
     SEND,
     SENDFILE,
     PROV_BUF,
+    CLOSE
 };
 /*
 typedef struct conn_info {
@@ -136,31 +137,12 @@ void setup_params(struct io_uring* ring)
     }
 }
 
-const char* s = "HTTP/1.1 101 Switching Protocols\r\n\
+const char* sASDASD = "HTTP/1.1 101 Switching Protocols\r\n\
 Upgrade: websocket\r\n\
 Connection: Upgrade\r\nSec-WebSocket-Accept:";
 
 int main(int argc, char *argv[])
 {
-/*
-    {
-        a3_log_init(stderr, A3_LOG_TRACE);
-
-        ScEventLoop* ev = sc_io_event_loop_new();
-        ScCoMain*    co = sc_co_main_new(ev);
-
-        ScListener* listener =
-            sc_listener_http_new(SC_DEFAULT_LISTEN_PORT, sc_http_handle_file_serve(A3_CS(".")), ev);
-        sc_listener_start(listener, co);
-
-        sc_io_event_loop_run(co);
-
-        sc_listener_free(listener);
-        sc_io_event_loop_free(ev);
-        sc_co_main_free(co);
-    }
-*/
-
     // NETWORK only
     // some variables we need
     int portno = 8090;//strtol(argv[1], NULL, 10);
@@ -222,7 +204,6 @@ int main(int argc, char *argv[])
     while (1) {
         // io uring enter
         io_uring_submit_and_wait(&ring, 1);
-        struct io_uring_cqe *cqe;
         unsigned head;
         unsigned count = 0;
 
@@ -378,8 +359,7 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
         .type = RECV,
     };
 */
-    //puts("read content");
-    recvbuf[message_size]=0;
+    recvbuf[message_size] = 0;
 
     //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
     sqe->user_data = CREATE_CQE_INFO(fd, 0, RECV);
@@ -403,9 +383,6 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
         .bid = bid,
     };
 */
-    //puts("write content");
-
-    //io_uring_submit_and_wait_timeout();
     //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
     sqe->user_data = CREATE_CQE_INFO(fd, bid, SEND);
 }
@@ -426,7 +403,12 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
 }
 
 
-void add_socket_close(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags)
+void add_socket_close(struct io_uring *ring, int fd)
 {
+    struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
+
+    io_uring_prep_close(sqe, fd);
+
+    sqe->user_data = CREATE_CQE_INFO(0, 0, CLOSE);
 }
 
