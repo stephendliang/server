@@ -1,3 +1,37 @@
+
+        /*
+
+        while (!endPointPtr->done() && !bHalting) {
+            do {
+                struct io_uring_cqe *cqe_ptr;
+                int res = io_uring_submit_and_wait_timeout(&ring, &cqe_ptr, 1,
+                                                           tsPtr, nullptr);
+                if (res != 0) printf("res = %d\n", res);
+            }
+            while (res < 0 && errno == ETIME && !bHalting);
+            unsigned completed = 0;
+            unsigned head;
+            struct io_uring_cqe *cqe;
+            io_uring_for_each_cqe(&ring, head, cqe) {
+                ++completed;
+                endPointPtr->processCompletion(&ring, cqe);
+            }
+            if (completed) {
+                io_uring_cq_advance(&ring, completed);
+            }
+        }
+        */
+
+        /*
+        
+        do {
+            res = io_uring_submit_and_wait_timeout(&ring, &cqe_ptr, 1, tsPtr, nullptr);
+        } while (res < 0 && errno == ETIME && !bHalting);
+
+
+        */
+
+
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -28,12 +62,12 @@ enum {
     SENDFILE,
     PROV_BUF,
 };
-
+/*
 typedef struct conn_info {
     __u32 fd;
     __u16 type;
     __u16 bid;
-} conn_info;
+} conn_info;*/
 
 #define CREATE_CQE_INFO(fd, bid, type) (((uint64_t)fd << 32) | ((uint64_t)bid << 16) | type)
 #define EXTRACT_FD(cqe_data) (cqe_data >> 32)
@@ -187,37 +221,6 @@ int main(int argc, char *argv[])
     // start event loop
     while (1) {
         // io uring enter
-        /*
-
-        while (!endPointPtr->done() && !bHalting) {
-            do {
-                struct io_uring_cqe *cqe_ptr;
-                int res = io_uring_submit_and_wait_timeout(&ring, &cqe_ptr, 1,
-                                                           tsPtr, nullptr);
-                if (res != 0) printf("res = %d\n", res);
-            }
-            while (res < 0 && errno == ETIME && !bHalting);
-            unsigned completed = 0;
-            unsigned head;
-            struct io_uring_cqe *cqe;
-            io_uring_for_each_cqe(&ring, head, cqe) {
-                ++completed;
-                endPointPtr->processCompletion(&ring, cqe);
-            }
-            if (completed) {
-                io_uring_cq_advance(&ring, completed);
-            }
-        }
-        */
-
-        /*
-        
-        do {
-            res = io_uring_submit_and_wait_timeout(&ring, &cqe_ptr, 1, tsPtr, nullptr);
-        } while (res < 0 && errno == ETIME && !bHalting);
-
-
-        */
         io_uring_submit_and_wait(&ring, 1);
         struct io_uring_cqe *cqe;
         unsigned head;
@@ -291,7 +294,8 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (count) io_uring_cq_advance(&ring, count);
+        //if (count)
+            io_uring_cq_advance(&ring, count);
     }
 
     return 0;
