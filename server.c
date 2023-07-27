@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 {
     // NETWORK only
     // some variables we need
-    int portno = 8090;//strtol(argv[1], NULL, 10);
+    int portno = 8888;//strtol(argv[1], NULL, 10);
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     int sock_listen_fd = get_socket(portno);
@@ -285,25 +285,12 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
 {
     //https://man7.org/linux/man-pages/man3/io_uring_prep_recv.3.html
 
-    io_uring_push_send((struct io_uring *)conn->svr->ring, conn->fd,
-                       fresstr->buf, fresstr->len, (void *)conn,
-                       MSG_MORE, IOSQE_IO_LINK);
-
-    io_uring_push_splice((struct io_uring *)conn->svr->ring,
-                         res.file_fd, 0, conn->svr->pipefds[1], -1,
-                         res.file_sz, (void *)conn, IOSQE_IO_LINK);
-
-    io_uring_push_splice((struct io_uring *)conn->svr->ring,
-                         conn->svr->pipefds[0], -1, conn->fd, -1,
-                         res.file_sz, (void *)conn, 0);
-
-
-    io_uring_prep_splice(struct io_uring_sqe *sqe,
-                         int fd_in,
-                         int64_t off_in,
-                         int fd_out,
-                         int64_t off_out,
-                         unsigned int nbytes,
+    io_uring_prep_splice(sqe,
+                         fd_file,
+                         off_file,
+                         fd_socket,
+                         off_socket?,
+                         bytes_for_socket,
                          unsigned int splice_flags);
 
 
@@ -336,13 +323,6 @@ void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, soc
     io_uring_prep_accept(sqe, fd, client_addr, client_len, 0);
     io_uring_sqe_set_flags(sqe, flags);
 
-/*
-    conn_info conn_i = {
-        .fd = fd,
-        .type = ACCEPT,
-    };
-*/
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
     sqe->user_data = CREATE_CQE_INFO(fd, 0, ACCEPT);
 }
 
@@ -376,14 +356,6 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
     io_uring_prep_send(sqe, fd, sz, strlen(sz), MSG_ZEROCOPY);
     io_uring_sqe_set_flags(sqe, flags);
 
-/*
-    conn_info conn_i = {
-        .fd = fd,
-        .type = SEND,
-        .bid = bid,
-    };
-*/
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
     sqe->user_data = CREATE_CQE_INFO(fd, bid, SEND);
 }
 
@@ -392,13 +364,6 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
     struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
     io_uring_prep_provide_buffers(sqe, bufs[bid], MAX_MESSAGE_LEN, 1, gid, bid);
 
-/*
-    conn_info conn_i = {
-        .fd = 0,
-        .type = PROV_BUF,
-    };
-*/
-    //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
     sqe->user_data = CREATE_CQE_INFO(0, 0, PROV_BUF);
 }
 
@@ -409,6 +374,6 @@ void add_socket_close(struct io_uring *ring, int fd)
 
     io_uring_prep_close(sqe, fd);
 
-    sqe->user_data = CREATE_CQE_INFO(0, 0, CLOSE);
+    sqe->user_data = CREATE_CQE_INFO(fd, 0, CLOSE);
 }
 
