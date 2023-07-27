@@ -1,40 +1,3 @@
-
-
-
-
-        /*
-
-        while (!endPointPtr->done() && !bHalting) {
-            do {
-                struct io_uring_cqe *cqe_ptr;
-                int res = io_uring_submit_and_wait_timeout(&ring, &cqe_ptr, 1,
-                                                           tsPtr, nullptr);
-                if (res != 0) printf("res = %d\n", res);
-            }
-            while (res < 0 && errno == ETIME && !bHalting);
-            unsigned completed = 0;
-            unsigned head;
-            struct io_uring_cqe *cqe;
-            io_uring_for_each_cqe(&ring, head, cqe) {
-                ++completed;
-                endPointPtr->processCompletion(&ring, cqe);
-            }
-            if (completed) {
-                io_uring_cq_advance(&ring, completed);
-            }
-        }
-        */
-
-        /*
-        
-        do {
-            res = io_uring_submit_and_wait_timeout(&ring, &cqe_ptr, 1, tsPtr, nullptr);
-        } while (res < 0 && errno == ETIME && !bHalting);
-
-
-        */
-
-
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -77,6 +40,7 @@ typedef struct conn_info {
 #define EXTRACT_FD(cqe_data) (cqe_data >> 32)
 #define EXTRACT_BID(cqe_data) ((cqe_data >> 16) & 0xFFFF)
 #define EXTRACT_TYPE(cqe_data) (cqe_data & 0xFFFF)
+
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 static struct io_uring ring;
@@ -138,10 +102,6 @@ void setup_params(struct io_uring* ring)
     }
 }
 
-const char* sASDASD = "HTTP/1.1 101 Switching Protocols\r\n\
-Upgrade: websocket\r\n\
-Connection: Upgrade\r\nSec-WebSocket-Accept:";
-
 int main(int argc, char *argv[])
 {
     // NETWORK only
@@ -151,12 +111,9 @@ int main(int argc, char *argv[])
     socklen_t client_len = sizeof(client_addr);
     int sock_listen_fd = get_socket(portno);
 
-
     //struct __kernel_timespec *tsPtr, ts;
     //memset(&ts, 0, sizeof(ts));
     //tsPtr = &ts;
-
-
 
     // IO after this
     // initialize io_uring
@@ -172,7 +129,6 @@ int main(int argc, char *argv[])
 
     puts ("checked stats, now make rings");
     //int res = 0;
-
 
     // register buffers for buffer selection
     struct io_uring_sqe *sqe;

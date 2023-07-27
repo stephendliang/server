@@ -40,6 +40,9 @@ typedef struct conn_info {
     __u16 bid;
 } conn_info;
 
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
 static struct io_uring ring;
 
 static uint8_t recvbuf[10000];
@@ -99,36 +102,8 @@ void setup_params(struct io_uring* ring)
     }
 }
 
-const char* s = "HTTP/1.1 101 Switching Protocols\r\n\
-Upgrade: websocket\r\n\
-Connection: Upgrade\r\nSec-WebSocket-Accept:";
-
 int main(int argc, char *argv[])
 {
-
-/*
-
-    {
-        a3_log_init(stderr, A3_LOG_TRACE);
-
-        ScEventLoop* ev = sc_io_event_loop_new();
-        ScCoMain*    co = sc_co_main_new(ev);
-
-        ScListener* listener =
-            sc_listener_http_new(SC_DEFAULT_LISTEN_PORT, sc_http_handle_file_serve(A3_CS(".")), ev);
-        sc_listener_start(listener, co);
-
-        sc_io_event_loop_run(co);
-
-        sc_listener_free(listener);
-        sc_io_event_loop_free(ev);
-        sc_co_main_free(co);
-    }
-*/
-
-
-
-
 
     // NETWORK only
     // some variables we need
@@ -201,9 +176,9 @@ int main(int argc, char *argv[])
             memcpy(&conn_i, &cqe->user_data, sizeof(conn_i));
 
             int type = conn_i.type;
-            if (cqe->res != -ENOBUFS) {
+            if (likely(cqe->res != -ENOBUFS)) {
                 if (type == PROV_BUF) {
-                    if (cqe->res < 0) {
+                    if (unlikely(cqe->res < 0)) {
                         printf("cqe->res = %d\n", cqe->res);
                         exit(1);
                     }
@@ -211,14 +186,14 @@ int main(int argc, char *argv[])
                     int bytes_read = cqe->res;
                     int bid = cqe->flags >> 16;
                     if (cqe->res <= 0) {
-                        //puts("failed");
+                        puts("failed");
 
                         // read failed, re-add the buffer
                         add_provide_buf(&ring, bid, group_id);
                         // connection closed or error
                         close(conn_i.fd);
                     } else {
-                        //printf("%d\n",bytes_read);
+                        printf("%d\n",bytes_read);
                         //recvbuf[bytes_read]=0;
 
                         // parse here, to decide if socket or sendfile
@@ -332,7 +307,6 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
         .type = READ,
     };
 
-    //puts("read content");
     recvbuf[message_size]=0;
 
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
@@ -354,8 +328,6 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
         .type = WRITE,
         .bid = bid,
     };
-
-    //puts("write content");
 
     //io_uring_submit_and_wait_timeout();
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
