@@ -36,9 +36,9 @@ typedef struct conn_info {
 } conn_info;
 
 #define CREATE_CQE_INFO(fd, bid, type) (((uint64_t)fd << 32) | ((uint64_t)bid << 16) | type)
-#define EXTRACT_FD(cqe_info) (fd >> 32)
-#define EXTRACT_BID(cqe_info) ((fd >> 16) & 0xFFFF)
-#define EXTRACT_TYPE(cqe_info) (fd & 0xFFFF)
+#define EXTRACT_FD(cqe_info) (cqe_info >> 32)
+#define EXTRACT_BID(cqe_info) ((cqe_info >> 16) & 0xFFFF)
+#define EXTRACT_TYPE(cqe_info) (cqe_info & 0xFFFF)
 
 static struct io_uring ring;
 
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
     }
 
     puts ("checked stats, now make rings");
-    int res = 0;
+    //int res = 0;
 
 
     // register buffers for buffer selection
@@ -234,12 +234,12 @@ int main(int argc, char *argv[])
             int ctype = EXTRACT_TYPE(cqe_data);
 
             if (cqe->res != -ENOBUFS) {
-                if (type == PROV_BUF) {
+                if (ctype == PROV_BUF) {
                     if (cqe->res < 0) {
                         printf("cqe->res = %d\n", cqe->res);
                         exit(1);
                     }
-                } else if (type == RECV) {
+                } else if (ctype == RECV) {
                     int bytes_read = cqe->res;
                     int bid = cqe->flags >> 16;
                     if (cqe->res <= 0) {
@@ -266,12 +266,12 @@ int main(int argc, char *argv[])
                             ////add_socket_sendfile(&ring,);
                         }
                     }
-                } else if (type == SEND) {
+                } else if (ctype == SEND) {
                     // write has been completed, first re-add the buffer
                     add_provide_buf(&ring, EXTRACT_BID(cqe_data), group_id);
                     // add a new read for the existing connection
                     add_socket_read(&ring, cfd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
-                } else if (type == ACCEPT) {
+                } else if (ctype == ACCEPT) {
                     int sock_conn_fd = cqe->res;
 
                     // only read the future data when there is no error, >= 0
@@ -281,7 +281,7 @@ int main(int argc, char *argv[])
                     // new connected client; read data from socket and re-add accept to monitor for new connections
                     // ALSO ACCEPT NEW CONNECTIONS FROM MORE CLIENTS
                     add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
-                } else if (type == SENDFILE) {
+                } else if (ctype == SENDFILE) {
                     puts("lol sendfile");
                 }
             } else {
@@ -419,7 +419,7 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
     };
 */
     //memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
-    sqe->user_data = CREATE_CQE_INFO(fd, 0, PROV_BUF);
+    sqe->user_data = CREATE_CQE_INFO(0, 0, PROV_BUF);
 }
 
 
