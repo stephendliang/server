@@ -386,7 +386,7 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
     sqe->user_data = CREATE_CQE_INFO(fd, 0, RECV);
 }
 
-const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: Closed\r\nContent-Length: 10\r\n\r\nHello Baby";
+const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: keep-alive\r\nContent-Length: 10\r\n\r\nHello Baby";
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags)
 {
