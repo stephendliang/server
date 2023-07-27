@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
             int type = conn_i.type;
             if (cqe->res != -ENOBUFS) {
                 if (type == PROV_BUF) {
-                    puts("PROV_BUF");
+                    //puts("PROV_BUF");
                     if (cqe->res < 0) {
                         printf("cqe->res = %d\n", cqe->res);
                         exit(1);
