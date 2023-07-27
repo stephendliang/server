@@ -205,16 +205,6 @@ int main(int argc, char *argv[])
                         printf("cqe->res = %d\n", cqe->res);
                         exit(1);
                     }
-                } else if (type == ACCEPT) {
-                    int sock_conn_fd = cqe->res;
-
-                    // only read the future data when there is no error, >= 0
-                    if (sock_conn_fd >= 0)
-                        add_socket_read(&ring, sock_conn_fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
-
-                    // new connected client; read data from socket and re-add accept to monitor for new connections
-                    // ALSO ACCEPT NEW CONNECTIONS FROM MORE CLIENTS
-                    add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
                 } else if (type == READ) {
                     int bytes_read = cqe->res;
                     int bid = cqe->flags >> 16;
@@ -246,6 +236,16 @@ int main(int argc, char *argv[])
                     add_provide_buf(&ring, conn_i.bid, group_id);
                     // add a new read for the existing connection
                     add_socket_read(&ring, conn_i.fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+                } else if (type == ACCEPT) {
+                    int sock_conn_fd = cqe->res;
+
+                    // only read the future data when there is no error, >= 0
+                    if (sock_conn_fd >= 0)
+                        add_socket_read(&ring, sock_conn_fd, group_id, MAX_MESSAGE_LEN, IOSQE_BUFFER_SELECT);
+
+                    // new connected client; read data from socket and re-add accept to monitor for new connections
+                    // ALSO ACCEPT NEW CONNECTIONS FROM MORE CLIENTS
+                    add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
                 } else if (type == SENDFILE) {
                     puts("lol sendfile");
                 }
@@ -336,7 +336,7 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
     memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
-const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: Closed\r\nContent-Length: 10\r\n\r\nHello Baby";
+const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: keep-alive\r\nContent-Length: 10\r\n\r\nHello Baby";
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags)
 {
