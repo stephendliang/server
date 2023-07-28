@@ -1,8 +1,3 @@
-
-
-
-
-
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -113,7 +108,9 @@ int main(int argc, char *argv[])
   int sock_listen_fd = get_socket(portno);
 
 
-
+  struct __kernel_timespec *tsPtr, ts;
+  memset(&ts, 0, sizeof(ts));
+  tsPtr = &ts;
 
 
   // IO after this
@@ -159,10 +156,16 @@ int main(int argc, char *argv[])
   // add first accept SQE to monitor for new incoming connections
   add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
 
+  int res = -1;
+
   // start event loop
   while (1) {
-    // io uring enter
-    // io_uring_submit_and_wait is not needed if SQ_POLL is used
+
+    do {
+      res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL);
+    } while (res < 0);
+    //} while (res < 0 && errno == ETIME && !bHalting);
+
 
     io_uring_submit_and_wait(&ring, 1);
     struct io_uring_cqe *cqe;
