@@ -232,7 +232,6 @@ int main(int argc, char *argv[])
         fprintf(stdout, "bufs in automatic buffer selection empty, this should not happen...\n");
         fflush(stdout);
         exit(1);
-
       }
     }
 
