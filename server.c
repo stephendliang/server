@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
     //} while (res < 0 && errno == ETIME && !bHalting);
 
 
-    io_uring_submit_and_wait(&ring, 1);
+    //io_uring_submit_and_wait(&ring, 1);
     struct io_uring_cqe *cqe;
     unsigned head;
     unsigned count = 0;
