@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
   struct __kernel_timespec *tsPtr, ts;
   memset(&ts, 0, sizeof(ts));
   tsPtr = &ts;
+  ts.tv_nsec = 100;
 
 
   // IO after this
@@ -161,9 +162,7 @@ int main(int argc, char *argv[])
   // start event loop
   while (1) {
 
-    do {
-      res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL);
-    } while (res < 0);
+    do { res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL); } while (res < 0);
     //} while (res < 0 && errno == ETIME && !bHalting);
 
 
