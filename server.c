@@ -78,6 +78,37 @@ int get_socket(int portno)
   return sock_listen_fd;
 }
 
+int get_udp_socket(int portno)
+{
+  struct sockaddr_in serv_addr;
+
+  // setup socket
+  int sock_listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
+  const int val = 1;
+  setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+  if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_ZEROCOPY, &val, sizeof(val)))
+    perror("setsockopt zerocopy");
+
+  memset(&serv_addr, 0, sizeof(serv_addr));
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(portno);
+  serv_addr.sin_addr.s_addr = INADDR_ANY;
+
+  // bind and listen
+  if (bind(sock_listen_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    perror("Error binding socket...\n");
+    exit(1);
+  }
+
+  if (listen(sock_listen_fd, BACKLOG) < 0) {
+    perror("Error listening on socket...\n");
+    exit(1);
+  }
+
+  return sock_listen_fd;
+}
+
 void setup_params(struct io_uring* ring)
 {
   struct io_uring_params params;
@@ -99,10 +130,10 @@ void setup_params(struct io_uring* ring)
 
 int main(int argc, char *argv[])
 {
-
   // NETWORK only
-  // some variables we need
-  int portno = 8888;//strtol(argv[1], NULL, 10);
+  // read config file
+  int portno = 8888;
+  //https://stackoverflow.com/questions/42906209/how-to-get-client-ip-by-the-socket-number-in-c
   struct sockaddr_in client_addr;
   socklen_t client_len = sizeof(client_addr);
   int sock_listen_fd = get_socket(portno);
@@ -245,28 +276,6 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
 {
   //https://man7.org/linux/man-pages/man3/io_uring_prep_recv.3.html
 
-  io_uring_push_send((struct io_uring *)conn->svr->ring, conn->fd,
-             fresstr->buf, fresstr->len, (void *)conn,
-             MSG_MORE, IOSQE_IO_LINK);
-
-  io_uring_push_splice((struct io_uring *)conn->svr->ring,
-             res.file_fd, 0, conn->svr->pipefds[1], -1,
-             res.file_sz, (void *)conn, IOSQE_IO_LINK);
-
-  io_uring_push_splice((struct io_uring *)conn->svr->ring,
-             conn->svr->pipefds[0], -1, conn->fd, -1,
-             res.file_sz, (void *)conn, 0);
-
-
-  io_uring_prep_splice(struct io_uring_sqe *sqe,
-             int fd_in,
-             int64_t off_in,
-             int fd_out,
-             int64_t off_out,
-             unsigned int nbytes,
-             unsigned int splice_flags);
-
-
   struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
   io_uring_prep_splice(sqe, fd_file, off_file, fd_socket, off_socket, bytes, // num bytes for file to send
              0); // unsigned int splice_flags);
@@ -333,6 +342,17 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
   //io_uring_submit_and_wait_timeout();
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
+
+void add_socket_close(struct io_uring *ring, int fd)
+{
+    struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
+    io_uring_prep_close(sqe, fd);
+  io_uring_sqe_set_flags(sqe, flags);
+
+    sqe->user_data = CREATE_CQE_INFO(fd, 0, CLOSE);
+}
+
+
 
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
 {
