@@ -45,6 +45,14 @@ static char bufs[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
 int group_id = 1337;
 
 
+static bool cont = true;
+
+static void sigint_handle(int no)
+{
+  (void)no;
+  cont = false;
+}
+
 int get_socket(int portno)
 {
   struct sockaddr_in serv_addr;
@@ -128,15 +136,24 @@ void setup_params(struct io_uring* ring)
   }
 }
 
+/*
 const char* req = 
 "POST / HTTP/1.1\r\n"
 "User-Agent: test\r\n"
 "Content-Length: 13\r\n"
 "\r\n"
-"Hello, world!";
+"Hello, world!";*/
 
 int main(int argc, char *argv[])
 {
+
+  /*input inp();
+  inp.init();
+  sockaddr_in serv_addr;
+
+  const char* forward_host = ;
+*/
+
   // NETWORK only
   // read config file
   int portno = 8888;

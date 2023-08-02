@@ -30,3 +30,24 @@ void setup_params()
         exit(0);
     }
 }
+
+
+
+void setup_params(struct io_uring* ring)
+{
+  struct io_uring_params params;
+  memset(&params, 0, sizeof(params));
+  params.flags |= IORING_SETUP_DEFER_TASKRUN;
+  params.flags |= IORING_SETUP_SINGLE_ISSUER;
+
+  if (io_uring_queue_init_params(MAX_MESSAGE_LEN, ring, &params) < 0) {
+    perror("io_uring_init_failed...\n");
+    exit(1);
+  }
+
+  // check if IORING_FEAT_FAST_POLL is supported
+  if (!(params.features & IORING_FEAT_FAST_POLL)) {
+    printf("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+    exit(0);
+  }
+}
