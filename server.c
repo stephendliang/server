@@ -44,14 +44,14 @@ static uint8_t recvbuf[10000];
 static char bufs[BUFFERS_COUNT][MAX_MESSAGE_LEN] = {0};
 int group_id = 1337;
 
-
+/*
 static bool cont = true;
 
 static void sigint_handle(int no)
 {
   (void)no;
   cont = false;
-}
+}*/
 
 int get_socket(int portno)
 {
@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_socket, int64_t off_socket, int bytes)
+void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_socket, int64_t off_socket, int bytes, unsigned flags)
 {
   //https://man7.org/linux/man-pages/man3/io_uring_prep_recv.3.html
 
@@ -365,15 +365,16 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
+/*
 void add_socket_close(struct io_uring *ring, int fd)
 {
-    struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-    io_uring_prep_close(sqe, fd);
+  struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
+  io_uring_prep_close(sqe, fd);
   io_uring_sqe_set_flags(sqe, flags);
 
-    sqe->user_data = CREATE_CQE_INFO(fd, 0, CLOSE);
+  sqe->user_data = CREATE_CQE_INFO(fd, 0, CLOSE);
 }
-
+*/
 
 
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
