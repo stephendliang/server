@@ -128,6 +128,13 @@ void setup_params(struct io_uring* ring)
   }
 }
 
+const char* req = 
+"POST / HTTP/1.1\r\n"
+"User-Agent: test\r\n"
+"Content-Length: 13\r\n"
+"\r\n"
+"Hello, world!";
+
 int main(int argc, char *argv[])
 {
   // NETWORK only
@@ -280,7 +287,7 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
   io_uring_prep_splice(sqe, fd_file, off_file, fd_socket, off_socket, bytes, // num bytes for file to send
              0); // unsigned int splice_flags);
   io_uring_sqe_set_flags(sqe, flags);
-  
+
   conn_info conn_i = {
     .fd = fd,
     .type = SENDFILE,
