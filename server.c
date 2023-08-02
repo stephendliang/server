@@ -306,7 +306,7 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
   io_uring_sqe_set_flags(sqe, flags);
 
   conn_info conn_i = {
-    .fd = fd,
+    .fd = fd_file,
     .type = SENDFILE,
   };
 
