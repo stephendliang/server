@@ -271,7 +271,7 @@ int main(int argc, char *argv[])
 
   return 0;
 }
-/*
+
 void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_socket, int64_t off_socket, int bytes)
 {
   //https://man7.org/linux/man-pages/man3/io_uring_prep_recv.3.html
@@ -279,17 +279,15 @@ void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_s
   struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
   io_uring_prep_splice(sqe, fd_file, off_file, fd_socket, off_socket, bytes, // num bytes for file to send
              0); // unsigned int splice_flags);
-
   io_uring_sqe_set_flags(sqe, flags);
+  
   conn_info conn_i = {
     .fd = fd,
     .type = SENDFILE,
   };
 
-  sqe->user_data = *((uint64_t*)&conn_i);
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
-*/
 
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags)
 {
