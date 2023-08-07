@@ -1,4 +1,4 @@
-CCFLAGS ?= -Wall -Werror -Wpedantic -Ofast -D_GNU_SOURCE -luring
+CCFLAGS ?= -Wall -Werror -Wpedantic -Ofast -march=native -D_GNU_SOURCE -luring
 all_targets = server server2 sqpoll
 
 .PHONY: liburing server server2 sqpoll
