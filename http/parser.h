@@ -11,13 +11,11 @@ extern "C" {
  * of a multiline header */
 struct header_kv
 {
-    const char *name;
-    size_t name_len;
-    const char *value;
-    size_t value_len;
+    str_view key;
+    str_view value;
 };
 
-struct header_v
+struct str_view
 {
     const char *value;
     size_t value_len;
@@ -35,14 +33,21 @@ struct http_request
     ** Default header kv-pairs, usually too common
     ** to treat in the same way as a standard header.
     */
-    struct header_v path;
-    struct header_v user_agent;
-    struct header_v accept_language;
-    struct header_v accept_encoding;
-    struct header_v accept;
-    struct header_v referrer;
-    struct header_v authorization;
-    struct header_v upgrade;
+    struct str_view path;
+
+    struct str_view user_agent;
+    struct str_view accept_language;
+    struct str_view accept_encoding;
+    struct str_view accept;
+    struct str_view referrer;
+    struct str_view authorization;
+    struct str_view upgrade;
+
+
+Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==
+Sec-WebSocket-Protocol: chat, superchat
+Sec-WebSocket-Version: 13
+
 
     struct header_kv* headers;
 };

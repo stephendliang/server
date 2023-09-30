@@ -84,6 +84,44 @@ int get_socket(int portno)
   printf("io_uring echo server listening for connections on port: %d\n", portno);
 
   return sock_listen_fd;
+
+
+
+
+}
+
+int get_sctp_socket()
+{
+  int listen_fd, ret, in;
+  struct sctp_sndrcvinfo sndrcvinfo;
+  struct sockaddr_in servaddr = {
+      .sin_family = AF_INET,
+      .sin_addr.s_addr = htonl(INADDR_ANY),
+      .sin_port = htons(MY_PORT_NUM),
+  };
+  struct sctp_initmsg initmsg = {
+       .sinit_num_ostreams = 5,
+       .sinit_max_instreams = 5,
+       .sinit_max_attempts = 4,
+  };
+
+  listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
+  if (listen_fd < 0)
+          die("socket");
+
+  if (bind(listen_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+    perror("Error binding socket...\n");
+    exit(1);
+  }
+
+  ret = setsockopt(listen_fd, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg));
+  if (ret < 0)
+          die("setsockopt");
+
+  ret = listen(listen_fd, initmsg.sinit_max_instreams);
+  if (ret < 0)
+          die("listen");
+
 }
 
 int get_udp_socket(int portno)
@@ -146,14 +184,6 @@ const char* req =
 
 int main(int argc, char *argv[])
 {
-
-  /*input inp();
-  inp.init();
-  sockaddr_in serv_addr;
-
-  const char* forward_host = ;
-*/
-
   // NETWORK only
   // read config file
   int portno = 8888;
