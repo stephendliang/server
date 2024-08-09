@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,79 @@
 #define MAX_MESSAGE_LEN     4096
 #define BUFFERS_COUNT       MAX_CONNECTIONS
 
+
+#define str8le(a, b, c, d, e, f, g, h) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32)|(u64(f)<<40)|(u64(g)<<48)|(u64(h)<<56))
+
+#define str8be(a, b, c, d, e, f, g, h) \
+(h|(u16(g)<<8)|(u32(f)<<16)|(u32(e)<<24)|(u64(d)<<32)|(u64(c)<<40)|(u64(b)<<48)|(u64(a)<<56))
+
+
+#define str7le(a, b, c, d, e, f, g) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32)|(u64(f)<<40)|(u64(g)<<48))
+
+#define str7be(a, b, c, d, e, f, g) \
+(g|(u16(f)<<8)|(u32(e)<<16)|(u32(d)<<24)|(u64(c)<<32)|(u64(b)<<40)|(u64(a)<<48))
+
+
+#define str6le(a, b, c, d, e, f) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32)|(u64(f)<<40))
+
+#define str6be(a, b, c, d, e, f) \
+(f|(u16(e)<<8)|(u32(d)<<16)|(u32(c)<<24)|(u64(b)<<32)|(u64(a)<<40))
+
+
+#define str5le(a, b, c, d, e) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32))
+
+#define str5be(a, b, c, d, e) \
+(e|(u16(d)<<8)|(u32(c)<<16)|(u32(b)<<24)|(u64(a)<<32))
+
+
+#define str4le(a, b, c, d) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24))
+
+#define str4be(a, b, c, d) \
+(d|(u16(c)<<8)|(u32(b)<<16)|(u32(a)<<24))
+
+
+#define str3le(a, b, c) \
+(a|(u16(b)<<8)|(u32(c)<<16))
+
+#define str3be(a, b, c) \
+(c|(u16(b)<<8)|(u32(a)<<16))
+
+
+#define str2le(a, b) \
+(a|(u16(b)<<8))
+
+#define str2be(a, b) \
+(b|(u16(a)<<8))
+
+#define substr4_le(x) \
+(x & 0xFFFFFFFFUL)
+#define substr4_be(x) \
+(x >> 4)
+
+#define substr5_le(x) \
+(x & 0xFFFFFFFFFFUL)
+#define substr5_be(x) \
+(x >> 3)
+
+#define substr6_le(x) \
+(x & 0xFFFFFFFFFFFFUL)
+#define substr6_be(x) \
+(x >> 2)
+
+#define substr7_le(x) \
+(x & 0xFFFFFFFFFFFFFFUL)
+#define substr7_be(x) \
+(x >> 1)
+
+
+
+
+
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags);
 void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t size, unsigned flags);
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t size, unsigned flags);
@@ -30,7 +104,7 @@ enum {
 };
 
 typedef struct conn_info {
-  __u32 fd;
+  int fd;
   __u16 type;
   __u16 bid;
 } conn_info;
@@ -53,6 +127,186 @@ static void sigint_handle(int no)
   cont = false;
 }*/
 
+
+
+int parse()
+{
+  uint64_t verb_str = *(uint64_t*)p;
+
+  if (substr4i(verb_str) == str4i('G','E','T',' ')) { verb = 0; p += 4; }
+  else if (substr5i(verb_str) == str5i('P','O','S','T',' ')) { verb = 1; p += 5; }
+  else if (substr4i(verb_str) == str4i('P','U','T',' ')) { verb = 2; p += 4; }
+  else if (substr7i(verb_str) == str7i('D','E','L','E','T','E',' ')) { verb = 3; p += 7; }
+  else if (        (verb_str) == str8i('O','P','T','I','O','N','S',' ')) { verb = 4; p += 8; }
+  else { return 1; }
+
+  if (p == '/') {
+    char* fvalue = p;
+    // replace with memchr
+    while (*p != ' ') ++p;
+    char* host_end = p;
+    size_t host_len = host_end - host;
+
+    host_value = pair(host,host_len);
+  } else {
+    return 2;
+  }
+
+  uint64_t verb_str = *(uint64_t*)p;
+  if (         (verb_str) == u64_str8('H','T','T','P','/','1','.','1')) { verb = 4; p += 8; }
+  if (         (verb_str) == u64_str8('H','T','T','P','/','1','.','0')) { verb = 4; p += 8; }
+
+  for (memcmp(p, "\r\n\r\n", 4) == 0) {
+    if (memcmp(p, "Host: ", 6) == 0) {
+      p += 6;
+
+      char* host = p;
+      while (*p != '\r' && *p != '\n') ++p;
+      char* host_end = p;
+      size_t host_len = host_end - host;
+
+      host_value = pair(host,host_len);
+    } else {
+      char* fname = p;
+      while (*p != ':') ++p;
+      char* fname_end = p;
+      size_t host_len = fname_end - fname;
+
+      ++p;
+      if (*p == ' ') ++p;
+
+      char* fvalue = p;
+      while (*p != '\r' && *p != '\n') ++p;
+      char* host_end = p;
+      size_t host_len = host_end - host;
+
+      host_value = pair(host,host_len);
+
+      header[pair(name,name_len)] = pair(value,value_len);
+    }
+
+    if (memcmp(p, "\r\n", 2) == 0) {
+      p += 2;
+    }
+  }
+
+}
+
+
+
+#define FRAME_HEADER_SIZE 9
+
+// Define a structure for an HTTP/2 frame header
+typedef struct {
+    uint32_t length;
+    uint8_t type;
+    uint8_t flags;
+    uint32_t stream_id;
+    uint8_t *payload;
+} http2_frame;
+
+// Function to parse an HTTP/2 frame header
+int parse_http2_frame(const uint8_t *data, size_t data_len, http2_frame *frame) {
+    if (data_len < FRAME_HEADER_SIZE) {
+        return -1; // Not enough data to parse the header
+    }
+
+    // Extract the length (24 bits)
+    frame->length = (data[0] << 16) | (data[1] << 8) | data[2];
+
+    // Extract the type (8 bits)
+    frame->type = data[3];
+
+    // Extract the flags (8 bits)
+    frame->flags = data[4];
+
+    // Extract the Stream Identifier (31 bits, ignore the first bit)
+    frame->stream_id = ((data[5] & 0x7F) << 24) | (data[6] << 16) | (data[7] << 8) | data[8];
+
+    // Extract the payload
+    if (data_len < FRAME_HEADER_SIZE + frame->length) {
+        return -1; // Not enough data for the payload
+    }
+    frame->payload = (uint8_t *)malloc(frame->length);
+    if (!frame->payload) {
+        return -1; // Memory allocation failure
+    }
+    memcpy(frame->payload, data + FRAME_HEADER_SIZE, frame->length);
+
+    return 0; // Success
+}
+
+// Function to free an HTTP/2 frame
+void free_http2_frame(http2_frame *frame) {
+    if (frame->payload) {
+        free(frame->payload);
+        frame->payload = NULL;
+    }
+}
+
+
+int parse_http2()
+{
+    // Example HTTP/2 frame data (length: 5, type: 1, flags: 0, stream_id: 1, payload: "Hello")
+    uint8_t data[] = {0x00, 0x00, 0x05, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 'H', 'e', 'l', 'l', 'o'};
+    size_t data_len = sizeof(data);
+
+    http2_frame frame;
+    if (parse_http2_frame(data, data_len, &frame) == 0) {
+        printf("Parsed HTTP/2 frame:\n");
+        printf("Length: %u\n", frame.length);
+        printf("Type: %u\n", frame.type);
+        printf("Flags: %u\n", frame.flags);
+        printf("Stream ID: %u\n", frame.stream_id);
+        printf("Payload: ");
+        for (uint32_t i = 0; i < frame.length; i++) {
+            printf("%c", frame.payload[i]);
+        }
+        printf("\n");
+
+        free_http2_frame(&frame);
+    } else {
+        printf("Failed to parse HTTP/2 frame\n");
+    }
+
+    return 0;
+}
+
+
+// UNUSED YET
+struct io_uring_buf_ring *setup_buffer_ring(struct io_uring *ring)
+{
+  struct io_uring_buf_reg reg = { };
+  struct io_uring_buf_ring *br;
+  int i;
+
+  /* allocate mem for sharing buffer ring */
+  if (posix_memalign((void **) &br, 4096,
+         BUFS_IN_GROUP * sizeof(struct io_uring_buf_ring)))
+    return NULL;
+
+  /* assign and register buffer ring */
+  reg.ring_addr = (unsigned long) br;
+  reg.ring_entries = BUFS_IN_GROUP;
+  reg.bgid = BUF_BGID;
+  if (io_uring_register_buf_ring(ring, &reg, 0))
+    return 1;
+
+  /* add initial buffers to the ring */
+  io_uring_buf_ring_init(br);
+  for (i = 0; i < BUFS_IN_GROUP; i++) {
+    /* add each buffer, we'll use i buffer ID */
+    io_uring_buf_ring_add(br, bufs[i], BUF_SIZE, i,
+              io_uring_buf_ring_mask(BUFS_IN_GROUP), i);
+  }
+
+  /* we've supplied buffers, make them visible to the kernel */
+  io_uring_buf_ring_advance(br, BUFS_IN_GROUP);
+  return br;
+}
+
+
+
 int get_socket(int portno)
 {
   struct sockaddr_in serv_addr;
@@ -60,7 +314,9 @@ int get_socket(int portno)
   // setup socket
   int sock_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   const int val = 1;
-  setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+  if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)))
+    perror("setsockopt reuseaddr");
 
   if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_ZEROCOPY, &val, sizeof(val)))
     perror("setsockopt zerocopy");
@@ -82,75 +338,6 @@ int get_socket(int portno)
   }
 
   printf("io_uring echo server listening for connections on port: %d\n", portno);
-
-  return sock_listen_fd;
-
-
-
-
-}
-
-int get_sctp_socket()
-{
-  int listen_fd, ret, in;
-  struct sctp_sndrcvinfo sndrcvinfo;
-  struct sockaddr_in servaddr = {
-      .sin_family = AF_INET,
-      .sin_addr.s_addr = htonl(INADDR_ANY),
-      .sin_port = htons(MY_PORT_NUM),
-  };
-  struct sctp_initmsg initmsg = {
-       .sinit_num_ostreams = 5,
-       .sinit_max_instreams = 5,
-       .sinit_max_attempts = 4,
-  };
-
-  listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
-  if (listen_fd < 0)
-          die("socket");
-
-  if (bind(listen_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-    perror("Error binding socket...\n");
-    exit(1);
-  }
-
-  ret = setsockopt(listen_fd, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg));
-  if (ret < 0)
-          die("setsockopt");
-
-  ret = listen(listen_fd, initmsg.sinit_max_instreams);
-  if (ret < 0)
-          die("listen");
-
-}
-
-int get_udp_socket(int portno)
-{
-  struct sockaddr_in serv_addr;
-
-  // setup socket
-  int sock_listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
-  const int val = 1;
-  setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-
-  if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_ZEROCOPY, &val, sizeof(val)))
-    perror("setsockopt zerocopy");
-
-  memset(&serv_addr, 0, sizeof(serv_addr));
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons(portno);
-  serv_addr.sin_addr.s_addr = INADDR_ANY;
-
-  // bind and listen
-  if (bind(sock_listen_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-    perror("Error binding socket...\n");
-    exit(1);
-  }
-
-  if (listen(sock_listen_fd, BACKLOG) < 0) {
-    perror("Error listening on socket...\n");
-    exit(1);
-  }
 
   return sock_listen_fd;
 }
@@ -184,8 +371,6 @@ const char* req =
 
 int main(int argc, char *argv[])
 {
-  // NETWORK only
-  // read config file
   int portno = 8888;
   //https://stackoverflow.com/questions/42906209/how-to-get-client-ip-by-the-socket-number-in-c
   struct sockaddr_in client_addr;
@@ -223,6 +408,7 @@ int main(int argc, char *argv[])
     puts("sqe is null");
     return 0;
   }
+
   io_uring_prep_provide_buffers(sqe, bufs, MAX_MESSAGE_LEN, BUFFERS_COUNT, group_id, 0);
 
   puts("uring buffers provided");
@@ -247,12 +433,9 @@ int main(int argc, char *argv[])
   // start event loop
   while (1) {
 
-    do { res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL); } while (res < 0);
-    //} while (res < 0 && errno == ETIME && !bHalting);
+    do {res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL);} while (res < 0);
 
-
-    //io_uring_submit_and_wait(&ring, 1);
-    struct io_uring_cqe *cqe;
+    //struct io_uring_cqe *cqe;
     unsigned head;
     unsigned count = 0;
 
@@ -273,27 +456,16 @@ int main(int argc, char *argv[])
           int bytes_read = cqe->res;
           int bid = cqe->flags >> 16;
           if (unlikely(cqe->res <= 0)) {
-            //puts("failed");
+            puts("failed buffer read");
 
             // read failed, re-add the buffer
             add_provide_buf(&ring, bid, group_id);
             // connection closed or error
             close(conn_i.fd);
           } else {
-            //printf("%d\n",bytes_read);
-            //recvbuf[bytes_read]=0;
-
-            // parse here, to decide if socket or sendfile
-            ////struct http_request req;
-            ////struct phr_http_header hdrs[64];
-
-            if (true) {
-              // bytes have been read into bufs, now add write to socket sqe
-              add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
-            } else {
-              // possibly [if there is a file requested]
-              ////add_socket_sendfile(&ring,);
-            }
+            printf("%d\n",bytes_read);
+            write(2,(char*)recvbuf, bytes_read);
+            add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
           }
         } else if (type == WRITE) {
           // write has been completed, first re-add the buffer
@@ -312,6 +484,8 @@ int main(int argc, char *argv[])
           add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
         } else if (type == SENDFILE) {
           puts("lol sendfile");
+        } else {
+          puts("something else");
         }
       } else {
         fprintf(stdout, "bufs in automatic buffer selection empty, this should not happen...\n");
@@ -381,6 +555,8 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
   struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
   //puts(bufs[bid]);
   //io_uring_prep_send(sqe, fd, &bufs[bid], message_size, 0);
+  write(2,(char*)bufs[bid],message_size);
+  puts("");
 
   io_uring_prep_send(sqe, fd, sz, strlen(sz), MSG_ZEROCOPY);
   io_uring_sqe_set_flags(sqe, flags);
@@ -406,7 +582,6 @@ void add_socket_close(struct io_uring *ring, int fd)
 }
 */
 
-
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
 {
   struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
@@ -418,4 +593,48 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
   };
 
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
+}
+
+
+/*
+int io_uring_register_buf_ring(struct io_uring *ring,
+             struct io_uring_buf_reg *reg,
+             unsigned int __maybe_unused flags)
+
+             */
+
+void add_register_buf_ring(struct io_uring *ring, __u16 bid, unsigned gid)
+{
+  struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
+  io_uring_prep_provide_buffers(sqe, bufs[bid], MAX_MESSAGE_LEN, 1, gid, bid);
+
+  conn_info conn_i = {
+    .fd = 0,
+    .type = PROV_BUF,
+  };
+
+  memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
+
+
+
+
+
+  struct io_uring_buf_reg reg = { };
+  struct io_uring_buf_ring *br;
+  int i;
+
+  /* allocate mem for sharing buffer ring */
+  if (posix_memalign((void **) &br, 4096,
+         BUFS_IN_GROUP * sizeof(struct io_uring_buf_ring)))
+    return NULL;
+
+  /* assign and register buffer ring */
+  reg.ring_addr = (unsigned long) br;
+  reg.ring_entries = BUFS_IN_GROUP;
+  reg.bgid = BUF_BGID;
+  if (io_uring_register_buf_ring(ring, &reg, 0))
+    return 1;
+
+
+
 }

@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,10 +12,82 @@
 #include <liburing.h>
 ////#include "http.h"
 
-#define MAX_CONNECTIONS     1024
-#define BACKLOG             512
-#define MAX_MESSAGE_LEN     4096
+#define MAX_CONNECTIONS     8192
+#define BACKLOG             2048
+#define MAX_MESSAGE_LEN     2048
 #define BUFFERS_COUNT       MAX_CONNECTIONS
+
+#define str8le(a, b, c, d, e, f, g, h) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32)|(u64(f)<<40)|(u64(g)<<48)|(u64(h)<<56))
+
+#define str8be(a, b, c, d, e, f, g, h) \
+(h|(u16(g)<<8)|(u32(f)<<16)|(u32(e)<<24)|(u64(d)<<32)|(u64(c)<<40)|(u64(b)<<48)|(u64(a)<<56))
+
+
+#define str7le(a, b, c, d, e, f, g) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32)|(u64(f)<<40)|(u64(g)<<48))
+
+#define str7be(a, b, c, d, e, f, g) \
+(g|(u16(f)<<8)|(u32(e)<<16)|(u32(d)<<24)|(u64(c)<<32)|(u64(b)<<40)|(u64(a)<<48))
+
+
+#define str6le(a, b, c, d, e, f) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32)|(u64(f)<<40))
+
+#define str6be(a, b, c, d, e, f) \
+(f|(u16(e)<<8)|(u32(d)<<16)|(u32(c)<<24)|(u64(b)<<32)|(u64(a)<<40))
+
+
+#define str5le(a, b, c, d, e) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24)|(u64(e)<<32))
+
+#define str5be(a, b, c, d, e) \
+(e|(u16(d)<<8)|(u32(c)<<16)|(u32(b)<<24)|(u64(a)<<32))
+
+
+#define str4le(a, b, c, d) \
+(a|(u16(b)<<8)|(u32(c)<<16)|(u32(d)<<24))
+
+#define str4be(a, b, c, d) \
+(d|(u16(c)<<8)|(u32(b)<<16)|(u32(a)<<24))
+
+
+#define str3le(a, b, c) \
+(a|(u16(b)<<8)|(u32(c)<<16))
+
+#define str3be(a, b, c) \
+(c|(u16(b)<<8)|(u32(a)<<16))
+
+
+#define str2le(a, b) \
+(a|(u16(b)<<8))
+
+#define str2be(a, b) \
+(b|(u16(a)<<8))
+
+#define substr4_le(x) \
+(x & 0xFFFFFFFFUL)
+#define substr4_be(x) \
+(x >> 4)
+
+#define substr5_le(x) \
+(x & 0xFFFFFFFFFFUL)
+#define substr5_be(x) \
+(x >> 3)
+
+#define substr6_le(x) \
+(x & 0xFFFFFFFFFFFFUL)
+#define substr6_be(x) \
+(x >> 2)
+
+#define substr7_le(x) \
+(x & 0xFFFFFFFFFFFFFFUL)
+#define substr7_be(x) \
+(x >> 1)
+
+
+
+
 
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags);
 void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t size, unsigned flags);
@@ -30,7 +103,7 @@ enum {
 };
 
 typedef struct conn_info {
-  __u32 fd;
+  int fd;
   __u16 type;
   __u16 bid;
 } conn_info;
@@ -60,10 +133,9 @@ int get_socket(int portno)
   // setup socket
   int sock_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   const int val = 1;
-  setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
-  if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_ZEROCOPY, &val, sizeof(val)))
-    perror("setsockopt zerocopy");
+  if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT | SO_ZEROCOPY, &val, sizeof(val)))
+    perror("setsockopt");
 
   memset(&serv_addr, 0, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
@@ -82,37 +154,6 @@ int get_socket(int portno)
   }
 
   printf("io_uring echo server listening for connections on port: %d\n", portno);
-
-  return sock_listen_fd;
-}
-
-int get_udp_socket(int portno)
-{
-  struct sockaddr_in serv_addr;
-
-  // setup socket
-  int sock_listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
-  const int val = 1;
-  setsockopt(sock_listen_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-
-  if (setsockopt(sock_listen_fd, SOL_SOCKET, SO_ZEROCOPY, &val, sizeof(val)))
-    perror("setsockopt zerocopy");
-
-  memset(&serv_addr, 0, sizeof(serv_addr));
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons(portno);
-  serv_addr.sin_addr.s_addr = INADDR_ANY;
-
-  // bind and listen
-  if (bind(sock_listen_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-    perror("Error binding socket...\n");
-    exit(1);
-  }
-
-  if (listen(sock_listen_fd, BACKLOG) < 0) {
-    perror("Error listening on socket...\n");
-    exit(1);
-  }
 
   return sock_listen_fd;
 }
@@ -136,26 +177,8 @@ void setup_params(struct io_uring* ring)
   }
 }
 
-/*
-const char* req = 
-"POST / HTTP/1.1\r\n"
-"User-Agent: test\r\n"
-"Content-Length: 13\r\n"
-"\r\n"
-"Hello, world!";*/
-
 int main(int argc, char *argv[])
 {
-
-  /*input inp();
-  inp.init();
-  sockaddr_in serv_addr;
-
-  const char* forward_host = ;
-*/
-
-  // NETWORK only
-  // read config file
   int portno = 8888;
   //https://stackoverflow.com/questions/42906209/how-to-get-client-ip-by-the-socket-number-in-c
   struct sockaddr_in client_addr;
@@ -169,20 +192,14 @@ int main(int argc, char *argv[])
   ts.tv_nsec = 100;
 
 
-  // IO after this
-  // initialize io_uring
   setup_params(&ring);
 
-  // check if buffer selection is supported
   struct io_uring_probe *probe;
   probe = io_uring_get_probe_ring(&ring);
   if (!probe || !io_uring_opcode_supported(probe, IORING_OP_PROVIDE_BUFFERS)) {
     printf("Buffer select not supported, skipping...\n");
     exit(0);
   }
-
-  puts ("checked stats, now make rings");
-
 
   // register buffers for buffer selection
   struct io_uring_sqe *sqe;
@@ -193,6 +210,7 @@ int main(int argc, char *argv[])
     puts("sqe is null");
     return 0;
   }
+
   io_uring_prep_provide_buffers(sqe, bufs, MAX_MESSAGE_LEN, BUFFERS_COUNT, group_id, 0);
 
   puts("uring buffers provided");
@@ -218,11 +236,8 @@ int main(int argc, char *argv[])
   while (1) {
 
     do { res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL); } while (res < 0);
-    //} while (res < 0 && errno == ETIME && !bHalting);
-
 
     //io_uring_submit_and_wait(&ring, 1);
-    struct io_uring_cqe *cqe;
     unsigned head;
     unsigned count = 0;
 
@@ -243,27 +258,21 @@ int main(int argc, char *argv[])
           int bytes_read = cqe->res;
           int bid = cqe->flags >> 16;
           if (unlikely(cqe->res <= 0)) {
-            //puts("failed");
+            puts("failed buffer read");
 
             // read failed, re-add the buffer
             add_provide_buf(&ring, bid, group_id);
             // connection closed or error
             close(conn_i.fd);
           } else {
-            //printf("%d\n",bytes_read);
+            printf("%d\n",bytes_read);
+            write(2,(char*)recvbuf, bytes_read);
             //recvbuf[bytes_read]=0;
 
             // parse here, to decide if socket or sendfile
             ////struct http_request req;
             ////struct phr_http_header hdrs[64];
-
-            if (true) {
-              // bytes have been read into bufs, now add write to socket sqe
-              add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
-            } else {
-              // possibly [if there is a file requested]
-              ////add_socket_sendfile(&ring,);
-            }
+            add_socket_write(&ring, conn_i.fd, bid, bytes_read, 0);
           }
         } else if (type == WRITE) {
           // write has been completed, first re-add the buffer
@@ -282,6 +291,8 @@ int main(int argc, char *argv[])
           add_accept(&ring, sock_listen_fd, (struct sockaddr *)&client_addr, &client_len, 0);
         } else if (type == SENDFILE) {
           puts("lol sendfile");
+        } else {
+          puts("something else");
         }
       } else {
         fprintf(stdout, "bufs in automatic buffer selection empty, this should not happen...\n");
@@ -294,23 +305,6 @@ int main(int argc, char *argv[])
   }
 
   return 0;
-}
-
-void add_sendfile(struct io_uring *ring, int fd_file, int64_t off_file, int fd_socket, int64_t off_socket, int bytes, unsigned flags)
-{
-  //https://man7.org/linux/man-pages/man3/io_uring_prep_recv.3.html
-
-  struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-  io_uring_prep_splice(sqe, fd_file, off_file, fd_socket, off_socket, bytes, // num bytes for file to send
-             0); // unsigned int splice_flags);
-  io_uring_sqe_set_flags(sqe, flags);
-
-  conn_info conn_i = {
-    .fd = fd_file,
-    .type = SENDFILE,
-  };
-
-  memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
 void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, socklen_t *client_len, unsigned flags)
@@ -326,6 +320,8 @@ void add_accept(struct io_uring *ring, int fd, struct sockaddr *client_addr, soc
 
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
+
+
 
 void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message_size, unsigned flags)
 {
@@ -344,6 +340,36 @@ void add_socket_read(struct io_uring *ring, int fd, unsigned gid, size_t message
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
+// idx because IOSQE_FIXED_FILE means the recv will take idx as an argument
+// instead of the literal file descriptor
+static int add_recv(struct ctx *ctx, int idx)
+{
+  struct io_uring_sqe *sqe;
+
+  if (get_sqe(ctx, &sqe))
+    return -1;
+
+  io_uring_prep_recv_multishot(sqe, idx, &ctx->msg, MSG_TRUNC);
+  //always had IOSQE_BUFFER_SELECT in the standard read
+  // fixed file not present though
+  sqe->flags |= IOSQE_FIXED_FILE;
+  sqe->flags |= IOSQE_BUFFER_SELECT;
+  sqe->buf_group = 0;
+  io_uring_sqe_set_data64(sqe, BUFFERS + 1);
+  return 0;
+}
+
+static void recycle_buffer(struct ctx *ctx, int idx)
+{
+  io_uring_buf_ring_add(ctx->buf_ring, get_buffer(ctx, idx), buffer_size(ctx), idx, io_uring_buf_ring_mask(BUFFERS), 0);
+  io_uring_buf_ring_advance(ctx->buf_ring, 1);
+}
+
+
+
+
+
+
 const char* sz = "HTTP/1.1 200 OK\r\nServer: IOU69420\r\nConnection: keep-alive\r\nContent-Length: 10\r\nContent-Type: text/plain\r\n\r\nHello Baby";
 
 void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_size, unsigned flags)
@@ -351,6 +377,8 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
   struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
   //puts(bufs[bid]);
   //io_uring_prep_send(sqe, fd, &bufs[bid], message_size, 0);
+  write(2,(char*)bufs[bid],message_size);
+  puts("");
 
   io_uring_prep_send(sqe, fd, sz, strlen(sz), MSG_ZEROCOPY);
   io_uring_sqe_set_flags(sqe, flags);
@@ -376,7 +404,6 @@ void add_socket_close(struct io_uring *ring, int fd)
 }
 */
 
-
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
 {
   struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
@@ -389,3 +416,11 @@ void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
 
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
+
+
+/*
+int io_uring_register_buf_ring(struct io_uring *ring,
+             struct io_uring_buf_reg *reg,
+             unsigned int __maybe_unused flags)
+
+             */
