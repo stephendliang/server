@@ -35,14 +35,11 @@ IOURINGINLINE void io_uring_buf_ring_advance(struct io_uring_buf_ring *br,
 }
 
 
-
-       void io_uring_prep_multishot_accept_direct(struct io_uring_sqe *sqe,
-                                                  int sockfd,
-                                                  struct sockaddr *addr,
-                                                  socklen_t *addrlen,
-                                                  int flags);
-
-
+void io_uring_prep_multishot_accept_direct(struct io_uring_sqe *sqe,
+                                          int sockfd,
+                                          struct sockaddr *addr,
+                                          socklen_t *addrlen,
+                                          int flags);
 
 // Min number of entries to wait for in the event loop
 static constexpr unsigned NUM_WAIT_ENTRIES = 1;
@@ -54,17 +51,6 @@ static constexpr unsigned NUM_SUBMISSION_QUEUE_ENTRIES = 2048;
 static constexpr unsigned IO_BUFFER_SIZE = 8192;
 // The number of IO buffers to pre-allocate
 static constexpr uint16_t NUM_IO_BUFFERS = 4096;
-
-
-
-
-explicit UringEchoServer(int port);
-~UringEchoServer();
-
-void run_event_loop(bool& loop);
-
-
-
 
 
 static inline int setup_sock(int port)
@@ -99,18 +85,6 @@ static inline int setup_sock(int port)
 
     return sock_listen_fd;
 }
-/*
-int process_rate_limit()
-{
-    struct sockaddr_in *addr = io_uring_recvmsg_name(o);
-    struct sockaddr_in6 *addr6 = (void *)addr;
-    void *paddr;
-
-    if (ctx->af == AF_INET6)
-        paddr = &addr6->sin6_addr;
-    else
-        paddr = &addr->sin_addr;
-}*/
 
 
 int setup_buffers(group_id)
@@ -252,9 +226,7 @@ int process_cqe_send(const char*)
     return 0;
 }
 
-
-
-static int add_recv(struct ctx *ctx, int idx)
+static int add_recv(int idx)
 {
     struct io_uring_sqe *sqe = get_sqe();
 
@@ -265,8 +237,6 @@ static int add_recv(struct ctx *ctx, int idx)
     io_uring_sqe_set_data64(sqe, BUFFERS + 1);
     return 0;
 }
-
-
 
 int process_cqe_recv(io_uring_cqe* cqe)
 {
@@ -414,6 +384,4 @@ int main()
     srv.setup();
     srv.evloop();
 }
-
-
 
