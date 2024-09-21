@@ -5,6 +5,7 @@ enum class output_type
     database
 };
 
+////////
 /*
  * Assign 'buf' with the addr/len/buffer ID supplied
  */
@@ -51,6 +52,7 @@ static constexpr unsigned NUM_SUBMISSION_QUEUE_ENTRIES = 2048;
 static constexpr unsigned IO_BUFFER_SIZE = 8192;
 // The number of IO buffers to pre-allocate
 static constexpr uint16_t NUM_IO_BUFFERS = 4096;
+///////////////////
 
 
 static inline int setup_sock(int port)
@@ -87,7 +89,7 @@ static inline int setup_sock(int port)
 }
 
 
-int setup_buffers(group_id)
+int setup_buffers(int group_id)
 {
     //The size of the ring is the product of ring_entries and the size of struct io_uring_buf
     buf_ring_size = (sizeof(struct io_uring_buf) + buffer_size(ctx)) * BUFFERS;
@@ -219,12 +221,6 @@ void add_socket_close(struct io_uring *ring, int fd)
     sqe->user_data = CREATE_CQE_INFO(fd, 0, CLOSE);
 }
 
-int process_cqe_send(const char*)
-{
-    int idx = cqe->user_data;
-    recycle_buffer(ctx, idx);
-    return 0;
-}
 
 static int add_recv(int idx)
 {
@@ -321,9 +317,9 @@ void server::evloop()
     while (1) {
         //do { res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL); } while (res < 0);
         io_uring_submit_and_wait(&ring, 1);
-
-
+        /*
         const unsigned num_cqes = io_uring_peek_batch_cqe(&ring_, cqes, CQE_BATCH_SIZE);
+
         for (unsigned cqe_idx = 0; cqe_idx < num_cqes; ++cqe_idx) {
             io_uring_cqe* cqe = cqes[cqe_idx];
             const auto ctx = get_context(cqe);
@@ -346,29 +342,32 @@ void server::evloop()
                     error(EXIT_ERROR, 0, "context type not handled: %d", static_cast<int>(ctx.type));
                     break;
             }
-        }
+        }*/
         
 
         // go through all CQEs
         io_uring_for_each_cqe(&ring, head, cqe) {
             ++count;
             uint64_t ud = cqe->user_data;
+            uint32_t type = GET_TYPE(ud);
 
+/*
+
+            Can you create an array of function pointers in C++ that are all of functions of a class and not static functions?
+*/
+
+#if (MF==3)
+
+            handle_func[type & 3](cqe, ctx.client_fd, ctx.buffer_idx);
+#elif (MF==3)
             if (type == READ) {
-                process_cqe_recv(cqe);
+                handle_read(cqe, ctx.client_fd);
             } else if (type == WRITE) {
-                process_cqe_send();
+                handle_write(cqe, ctx.client_fd, ctx.buffer_idx);
             } else if (type == ACCEPT) {
-                // only read the future data when there is no error, >= 0
-                //IORING_CQE_F_MORE
-                if (cqe->res >= 0) {
-                    if (!(cqe->flags & IORING_CQE_F_MORE)) {
-                        ret = add_accept(ctx, fdidx);
-                    }
-
-                    add_recv();
-                }
+                handle_accept(cqe);
             }
+#endif
         }
 
         io_uring_cq_advance(&ring, count);

@@ -34,7 +34,6 @@ struct http_request
     ** to treat in the same way as a standard header.
     */
     struct str_view path;
-
     struct str_view user_agent;
     struct str_view accept_language;
     struct str_view accept_encoding;
@@ -42,13 +41,6 @@ struct http_request
     struct str_view referrer;
     struct str_view authorization;
     struct str_view upgrade;
-
-
-Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==
-Sec-WebSocket-Protocol: chat, superchat
-Sec-WebSocket-Version: 13
-
-
     struct header_kv* headers;
 };
 
