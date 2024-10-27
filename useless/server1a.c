@@ -393,17 +393,6 @@ void add_socket_write(struct io_uring *ring, int fd, __u16 bid, size_t message_s
   memcpy(&sqe->user_data, &conn_i, sizeof(conn_i));
 }
 
-/*
-void add_socket_close(struct io_uring *ring, int fd)
-{
-  struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-  io_uring_prep_close(sqe, fd);
-  io_uring_sqe_set_flags(sqe, flags);
-
-  sqe->user_data = CREATE_CQE_INFO(fd, 0, CLOSE);
-}
-*/
-
 void add_provide_buf(struct io_uring *ring, __u16 bid, unsigned gid)
 {
   struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
