@@ -1,4 +1,4 @@
-#include "server.hh"
+#include "uring_server.hh"
 
 static inline int setup_socket(int port)
 {
@@ -252,9 +252,9 @@ void uring_server::register_file_table()
 
 
 
-
-void uring_server::handle_send(io_uring_cqe* cqe, int32_t result, uint16_t buffer_idx)
+void uring_server::handle_send(io_uring_cqe* cqe, uint16_t buffer_idx)
 {
+    const auto result = cqe->res;
     if (result == -EPIPE || result == -EBADF || result == -ECONNRESET) [[unlikely]] {
         // EPIPE - Broken pipe
         // ECONNRESET - Connection reset by peer
@@ -269,8 +269,10 @@ void uring_server::handle_send(io_uring_cqe* cqe, int32_t result, uint16_t buffe
 
 /////////
 ///////// client_fd is actually an idx
-void uring_server::handle_accept(io_uring_cqe* cqe, int32_t client_fd, uint16_t buffer_idx)
+void uring_server::handle_accept(io_uring_cqe* cqe, uint16_t buffer_idx)
 {
+    const auto client_fd = cqe->res;
+    
     if (!flag_is_set(cqe, IORING_CQE_F_MORE)) [[unlikely]] {
         // The current accept will not produce any more entries, add a new one
         add_accept();
@@ -285,7 +287,7 @@ void uring_server::handle_accept(io_uring_cqe* cqe, int32_t client_fd, uint16_t 
     }
 }
 
-void uring_server::handle_recv(io_uring_cqe* cqe, int32_t client_fd, uint16_t buffer_idx)
+void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
 {
     const auto result = cqe->res;
     bool closed = false;
@@ -411,22 +413,20 @@ void uring_server::evloop()
 
         io_uring_for_each_cqe(&ring, head, cqe) {
             ++count;
-            const auto ctx = get_context(cqe);
 
             user_data_t ud = cqe->user_data;
             uint32_t type = ud;
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
-            (this->*hfcs[type & 3])(cqe, ctx.client_fd, ctx.buffer_idx);
+            (this->*hfcs[type & 3])(cqe, ud.client_fd, ud.buffer_idx);
 
 #elif CQE_HANDLER_STYLE==CQE_HANDLER_IF_CHAIN
             if (type == URING_OP::ACCEPT)
                 handle_accept(cqe);
             else if (type == URING_OP::RECV)
-                handle_recv(cqe, ctx.client_fd);
+                handle_recv(cqe, ud.client_fd);
             else if (type == URING_OP::SEND)
-                handle_write(cqe, ctx.client_fd, ctx.buffer_idx);
-
+                handle_write(cqe, ud.client_fd, ud.buffer_idx);
 #endif
         }
 

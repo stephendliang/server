@@ -99,11 +99,11 @@ public:
 
     void ev_loop();
 
-    void handle_accept(io_uring_cqe* cqe);
+    void handle_accept(io_uring_cqe* cqe, uint16_t buffer_idx);
 
-    void handle_recv(io_uring_cqe* cqe, int client_fd);
+    void handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx);
 
-    void handle_send(io_uring_cqe* cqe, int client_fd, uint16_t buffer_idx);
+    void handle_send(io_uring_cqe* cqe, uint16_t buffer_idx);
 
     inline io_uring_sqe* get_sqe()
     {
