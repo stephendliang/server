@@ -252,6 +252,21 @@ void uring_server::register_file_table()
 
 
 
+
+void uring_server::handle_send(io_uring_cqe* cqe, int32_t result, uint16_t buffer_idx)
+{
+    if (result == -EPIPE || result == -EBADF || result == -ECONNRESET) [[unlikely]] {
+        // EPIPE - Broken pipe
+        // ECONNRESET - Connection reset by peer
+        // EBADF - Fd has been closed
+        add_close(client_fd);
+    } else if (result < 0) {
+        LOG_ERROR("Write error: %d\n", result);
+    }
+
+    recycle_buffer(buf_ring_, io_buffers_base_addr_, buffer_idx);
+}
+
 /////////
 ///////// client_fd is actually an idx
 void uring_server::handle_accept(io_uring_cqe* cqe, int32_t client_fd, uint16_t buffer_idx)
@@ -362,22 +377,6 @@ void uring_server::handle_recv2(io_uring_cqe* cqe, int32_t client_fd, uint16_t b
     }
 }
 
-void uring_server::handle_send(io_uring_cqe* cqe, int client_fd, uint16_t buffer_idx)
-{
-    const auto result = cqe->res;
-    if (result == -EPIPE || result == -EBADF || result == -ECONNRESET) [[unlikely]] {
-        // EPIPE - Broken pipe
-        // ECONNRESET - Connection reset by peer
-        // EBADF - Fd has been closed
-        add_close(client_fd);
-    } else if (result < 0) {
-        LOG_ERROR("Write error: %d\n", result);
-    }
-
-    recycle_buffer(buf_ring_, io_buffers_base_addr_, buffer_idx);
-}
-
-
 /*
 
 So there is now a pretty big difference between the received and send buffers.
@@ -393,6 +392,7 @@ By having two separate buffers as well as different buffer groups, you will not 
 
 void uring_server::evloop()
 {
+    io_uring_cqe* cqes[CQE_BATCH_SIZE];
     unsigned head;
     unsigned count = 0;
 
@@ -409,17 +409,9 @@ void uring_server::evloop()
         
         typedef void (uring_server::*handle_func_t)(io_uring_cqe* cqe, int client_fd, uint16_t buffer_idx);
 
-#if CQE_LOOP_STYLE==CQE_CLASSIC_LOOP
-        const unsigned num_cqes = io_uring_peek_batch_cqe(&ring_, cqes, CQE_BATCH_SIZE);
-        for (unsigned cqe_idx = 0; cqe_idx < num_cqes; ++cqe_idx) {
-            io_uring_cqe* cqe = cqes[cqe_idx];
-
-#elif CQE_LOOP_STYLE==CQE_LIBURING_LOOP
         io_uring_for_each_cqe(&ring, head, cqe) {
             ++count;
             const auto ctx = get_context(cqe);
-
-#endif
 
 #if CQE_LOOP_HANDLE_ERROR
             if (result == -EPIPE || result == -EBADF || result == -ECONNRESET) [[unlikely]] {
@@ -447,9 +439,7 @@ void uring_server::evloop()
 #endif
         }
 
-#if CQE_LOOP_STYLE==CQE_LIBURING_LOOP
         io_uring_cq_advance(&ring, count);
-#endif
         // now send all the messages to users that were accumulated in the send_queue.
     }
 }
