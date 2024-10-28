@@ -413,15 +413,6 @@ void uring_server::evloop()
             ++count;
             const auto ctx = get_context(cqe);
 
-#if CQE_LOOP_HANDLE_ERROR
-            if (result == -EPIPE || result == -EBADF || result == -ECONNRESET) [[unlikely]] {
-                // EPIPE - Broken pipe
-                // ECONNRESET - Connection reset by peer
-                // EBADF - Fd has been closed
-                add_close(client_fd);
-            }
-#endif
-
             user_data_t ud = cqe->user_data;
             uint32_t type = ud;
 

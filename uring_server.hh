@@ -50,9 +50,9 @@ static void set_context(io_uring_sqe* sqe, ContextType type, int32_t client_fd, 
     &sqe->user_data = user_data_t{client_fd, type, buffer_idx};
 }
 
-
 struct uring_server
 {
+/*
     unsigned char *buffer_base;
     struct msghdr msg;
     int buf_shift;
@@ -62,7 +62,6 @@ struct uring_server
     size_t buf_ring_size;
 
 
-/*
     // Min number of entries to wait for in the event loop
     static constexpr unsigned NUM_WAIT_ENTRIES = 1;
     // The maximum number of entries to retrieve in a single loop iteration
