@@ -1,5 +1,14 @@
 #include "uring_server.hh"
 
+#include <cstdlib>
+#include <cstring>
+
+// Linux
+#include <error.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 static inline int setup_socket(int port)
 {
     struct sockaddr_in serv_addr;
