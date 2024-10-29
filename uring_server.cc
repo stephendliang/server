@@ -41,7 +41,7 @@ static inline int setup_socket(int port)
     return sock_listen_fd;
 }
 
-static void init_io_uring(io_uring* ring, unsigned num_submission_queue_entries)
+static inline void init_io_uring(io_uring* ring, unsigned num_submission_queue_entries)
 {
     io_uring_params params;
     memset(&params, 0, sizeof(params));
