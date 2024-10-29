@@ -148,7 +148,10 @@ uring_server::uring_server()
     io_buffers_base_addr_ = init_buffer_ring(&ring_, &buf_ring_, ring_size);
 
     // register files()
-    register_file_table();
+    if (io_uring_register_files_sparse(ring, NR_FILES)) {
+
+    }
+
 }
 
 uring_server::~uring_server()
@@ -232,9 +235,6 @@ static void recycle_buffer(io_uring_buf_ring* br, uint8_t* buf_base_addr, uint16
 
 void uring_server::register_file_table()
 {
-    if (io_uring_register_files_sparse(ring, NR_FILES)) {
-
-    }
 
     return ret;
 }
@@ -357,7 +357,7 @@ void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
     }
 }
 */
-void uring_server::handle_recv(io_uring_cqe* cqe, int32_t client_fd, uint16_t buffer_idx)
+void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
 {
     const auto result = cqe->res;
     bool closed = false;
@@ -415,17 +415,17 @@ void uring_server::evloop()
     add_accept();
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
-    typedef void (uring_server::*handle_func_t)(io_uring_cqe* cqe, int client_fd, uint16_t buffer_idx);
+    typedef void (uring_server::*handle_func_t)(io_uring_cqe* cqe, uint16_t buffer_idx);
     handle_func_t hfcs[] = { &uring_server::handle_recv, &uring_server::handle_send, &uring_server::handle_send, &uring_server::handle_accept };
 #endif
 
     // start event loop
     while (1) {
-        //do { res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL); } while (res < 0);
-        io_uring_submit_and_wait(&ring, 1);
+        //do { res = io_uring_submit_and_wait_timeout(&ring_, &cqe, 1, tsPtr, NULL); } while (res < 0);
+        io_uring_submit_and_wait(&ring_, 1);
         
 
-        io_uring_for_each_cqe(&ring, head, cqe) {
+        io_uring_for_each_cqe(&ring_, head, cqe) {
             ++count;
 
             user_data_t ud = cqe->user_data;
@@ -444,7 +444,7 @@ void uring_server::evloop()
 #endif
         }
 
-        io_uring_cq_advance(&ring, count);
+        io_uring_cq_advance(&ring_, count);
         // now send all the messages to users that were accumulated in the send_queue.
     }
 }
