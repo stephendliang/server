@@ -120,12 +120,12 @@ public:
         return sqe;
     }
 
-    inline void add_accept(int sockfd_idx)
+    inline void add_accept()
     {
         io_uring_sqe *sqe = get_sqe();
         io_uring_sqe_set_data64(sqe, user_data_t(-1, URING_OP::ACCEPT, 0));
 
-        io_uring_prep_multishot_accept_direct(sqe, sockfd_idx, client_addr_, client_len_, 0);
+        io_uring_prep_multishot_accept_direct(sqe, listening_socket_, client_addr_, client_len_, 0);
     }
 
     inline void add_close(int client_fd)

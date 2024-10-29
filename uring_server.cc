@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 
 // Linux
 #include <error.h>
@@ -414,6 +415,7 @@ void uring_server::evloop()
     add_accept();
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
+    typedef void (uring_server::*handle_func_t)(io_uring_cqe* cqe, int client_fd, uint16_t buffer_idx);
     handle_func_t hfcs[] = { &uring_server::handle_recv, &uring_server::handle_write, &uring_server::handle_accept };
 #endif
 
@@ -422,7 +424,6 @@ void uring_server::evloop()
         //do { res = io_uring_submit_and_wait_timeout(&ring, &cqe, 1, tsPtr, NULL); } while (res < 0);
         io_uring_submit_and_wait(&ring, 1);
         
-        typedef void (uring_server::*handle_func_t)(io_uring_cqe* cqe, int client_fd, uint16_t buffer_idx);
 
         io_uring_for_each_cqe(&ring, head, cqe) {
             ++count;
