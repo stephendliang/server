@@ -104,7 +104,7 @@ static uint8_t* init_buffer_ring(io_uring* ring, io_uring_buf_ring** buf_ring, s
     io_uring_buf_reg reg{};
     memset(&reg, 0, sizeof(reg));
     reg.ring_addr = reinterpret_cast<__u64>(ring_addr);
-    reg.ring_entries = UringEchoServer::NUM_IO_BUFFERS;
+    reg.ring_entries = uring_server::NUM_IO_BUFFERS;
     reg.bgid = BUFFER_GROUP_ID;
 
     const unsigned flags = 0;
@@ -120,17 +120,17 @@ static uint8_t* init_buffer_ring(io_uring* ring, io_uring_buf_ring** buf_ring, s
     uint8_t* buffer_base_addr = get_buffer_base_addr(ring_addr);
 
     // Add all buffers to a shared buffer ring
-    for (uint16_t buffer_idx = 0u; buffer_idx < UringEchoServer::NUM_IO_BUFFERS; ++buffer_idx) {
+    for (uint16_t buffer_idx = 0u; buffer_idx < uring_server::NUM_IO_BUFFERS; ++buffer_idx) {
         // https://man7.org/linux/man-pages/man3/io_uring_buf_ring_add.3.html
         io_uring_buf_ring_add(*buf_ring, get_buffer_addr(buffer_base_addr, /* bid */ buffer_idx),
-                              UringEchoServer::IO_BUFFER_SIZE, buffer_idx,
-                              io_uring_buf_ring_mask(UringEchoServer::NUM_IO_BUFFERS),
+                              uring_server::IO_BUFFER_SIZE, buffer_idx,
+                              io_uring_buf_ring_mask(uring_server::NUM_IO_BUFFERS),
                               /* buf_offset */ buffer_idx);
     }
 
     // Make 'count' new buffers visible to the kernel. Called after io_uring_buf_ring_add() has been called
     // 'count' times to fill in new buffers.
-    io_uring_buf_ring_advance(*buf_ring, UringEchoServer::NUM_IO_BUFFERS);
+    io_uring_buf_ring_advance(*buf_ring, uring_server::NUM_IO_BUFFERS);
 
     return buffer_base_addr;
 }
@@ -225,8 +225,8 @@ static void recycle_buffer(io_uring_buf_ring* br, uint8_t* buf_base_addr, uint16
     // provided before the tail is committed with io_uring_buf_ring_advance(3) or
     // io_uring_buf_ring_cq_advance(3), then buf_offset should be 0
 
-    //io_uring_buf_ring_add(buf_ring, buf_base_addr + (idx << log2<UringEchoServer::IO_BUFFER_SIZE>()), UringEchoServer::IO_BUFFER_SIZE, idx,
-    //                      io_uring_buf_ring_mask(UringEchoServer::NUM_IO_BUFFERS), /* buf_offset */ 0);
+    //io_uring_buf_ring_add(buf_ring, buf_base_addr + (idx << log2<uring_server::IO_BUFFER_SIZE>()), uring_server::IO_BUFFER_SIZE, idx,
+    //                      io_uring_buf_ring_mask(uring_server::NUM_IO_BUFFERS), /* buf_offset */ 0);
     io_uring_buf_ring_add(br, buf_base_addr + (1U << BUFSIZE_SHIFT) * i, 1U << BUFSIZE_SHIFT, i, io_uring_buf_ring_mask(NUM_BUFFERS), 0);
 
     // Make the buffer visible to the kernel
@@ -429,17 +429,16 @@ void uring_server::evloop()
             ++count;
 
             user_data_t ud = cqe->user_data;
-            uint32_t type = ud;
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
-            (this->*hfcs[type & 3])(cqe, ud.client_fd, ud.buffer_idx);
+            (this->*hfcs[ud.type & 3])(cqe, ud.client_fd, ud.buffer_idx);
 
 #elif CQE_HANDLER_STYLE==CQE_HANDLER_IF_CHAIN
-            if (type == URING_OP::ACCEPT)
+            if (ud.type == URING_OP::ACCEPT)
                 handle_accept(cqe);
-            else if (type == URING_OP::RECV)
+            else if (ud.type == URING_OP::RECV)
                 handle_recv(cqe, ud.client_fd);
-            else if (type == URING_OP::SEND)
+            else if (ud.type == URING_OP::SEND)
                 handle_write(cqe, ud.client_fd, ud.buffer_idx);
 #endif
         }

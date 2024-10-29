@@ -48,17 +48,6 @@ static void set_context(io_uring_sqe* sqe, ContextType type, int32_t client_fd, 
 
 class uring_server
 {
-    // Min number of entries to wait for in the event loop
-    static constexpr unsigned NUM_WAIT_ENTRIES = 1;
-    // The maximum number of entries to retrieve in a single loop iteration
-    static constexpr unsigned CQE_BATCH_SIZE = 256;
-    // The size of the SQ. By default, the CQ ring will be twice this number
-    static constexpr unsigned NUM_SUBMISSION_QUEUE_ENTRIES = 4096;
-    
-    // The size of each pre-allocated IO buffer. Power-of-2.
-    static constexpr unsigned IO_BUFFER_SIZE = 2048;
-    // The number of IO buffers to pre-allocate
-    static constexpr uint16_t NUM_IO_BUFFERS = 4096;
 /*
     unsigned char *buffer_base;
     struct msghdr msg;
@@ -86,6 +75,19 @@ class uring_server
     socklen_t client_addr_len_ = sizeof(client_addr_);
 
 public:
+    // Min number of entries to wait for in the event loop
+    static constexpr unsigned NUM_WAIT_ENTRIES = 1;
+    // The maximum number of entries to retrieve in a single loop iteration
+    static constexpr unsigned CQE_BATCH_SIZE = 256;
+    // The size of the SQ. By default, the CQ ring will be twice this number
+    static constexpr unsigned NUM_SUBMISSION_QUEUE_ENTRIES = 4096;
+    
+    // The size of each pre-allocated IO buffer. Power-of-2.
+    static constexpr unsigned IO_BUFFER_SIZE = 2048;
+    // The number of IO buffers to pre-allocate
+    static constexpr uint16_t NUM_IO_BUFFERS = 4096;
+
+    
     uring_server();
 
     ~uring_server();
