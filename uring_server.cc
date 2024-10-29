@@ -272,7 +272,7 @@ void uring_server::handle_send(io_uring_cqe* cqe, uint16_t buffer_idx)
 void uring_server::handle_accept(io_uring_cqe* cqe, uint16_t buffer_idx)
 {
     const auto client_fd = cqe->res;
-    
+
     if (!flag_is_set(cqe, IORING_CQE_F_MORE)) [[unlikely]] {
         // The current accept will not produce any more entries, add a new one
         add_accept();
@@ -394,7 +394,8 @@ By having two separate buffers as well as different buffer groups, you will not 
 
 void uring_server::evloop()
 {
-    io_uring_cqe* cqes[CQE_BATCH_SIZE];
+    
+    //io_uring_cqe* cqes[CQE_BATCH_SIZE];
     unsigned head;
     unsigned count = 0;
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "util/util.h"
-
 #include <liburing.h>
 #include <netinet/in.h>
 
@@ -26,14 +24,12 @@ enum class URING_OP : uint8_t
     CLOSE,
 };
 
-
 enum class output_type : uint8_t
 {
     server = 0,
     client,
     database
 };
-
 
 struct user_data_t
 {
