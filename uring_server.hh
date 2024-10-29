@@ -33,9 +33,9 @@ enum class output_type : uint8_t
 
 struct user_data_t
 {
-    uint64_t client_fd : 32;
-    URING_OP type : 16;
-    uint64_t buffer_idx : 16;
+    int64_t client_fd : 32;
+    int64_t type : 16;
+    int64_t buffer_idx : 16;
 };
 
 // Context layout (8-bytes)
@@ -122,7 +122,7 @@ public:
     inline void add_accept(int sockfd_idx)
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, set_context(URING_OP::ACCEPT, /* client_fd */ -1, /* buffer_idx */ 0));
+        io_uring_sqe_set_data64(sqe, user_data_t(-1, URING_OP::ACCEPT, 0));
 
         io_uring_prep_multishot_accept_direct(sqe, sockfd_idx, client_addr_, client_len_, 0);
     }
@@ -130,7 +130,7 @@ public:
     inline void add_close(int client_fd)
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, set_context(URING_OP::CLOSE, client_fd, 0));
+        io_uring_sqe_set_data64(sqe, set_context(client_fd, URING_OP::CLOSE, 0));
 
         io_uring_prep_close(sqe, client_fd);
         io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
@@ -139,7 +139,7 @@ public:
     inline void add_recv(int client_fd_idx)
     {
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, set_context(URING_OP::RECV, client_fd_idx, 0));
+        io_uring_sqe_set_data64(sqe, set_context(client_fd_idx, URING_OP::RECV, 0));
 
         // len must be 0
         io_uring_prep_recv_multishot(sqe, client_fd_idx, nullptr, 0, 0);
@@ -150,7 +150,7 @@ public:
     inline void add_send(int client_fd, const void* data, unsigned length, uint16_t buffer_idx)
     {
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, set_context(URING_OP::SEND, client_fd, buffer_idx));
+        io_uring_sqe_set_data64(sqe, set_context(client_fd, URING_OP::SEND, buffer_idx));
 
         io_uring_prep_send_zc_fixed(sqe, client_fd, data, length, 0);
     }

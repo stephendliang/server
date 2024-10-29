@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <errno.h>
 
 static inline int setup_socket(int port)
 {
@@ -52,16 +53,19 @@ static void init_io_uring(io_uring* ring, unsigned num_submission_queue_entries)
     //  io_uring queues. On failure -errno is returned.
     int ret = io_uring_queue_init_params(num_submission_queue_entries, ring, &params);
     if (ret != 0) {
-        error(EXIT_ERROR, init_result, "io_uring_queue_init");
+        perror("io_uring_queue_init_params");
+        exit(1);
     }
 
     // check if IORING_FEAT_FAST_POLL is supported
     if (!(params.features & IORING_FEAT_FAST_POLL)) {
-        error("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+        perror("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+        exit(1);
     }
 
     if (io_uring_register_ring_fd(&ring) != 1) {
-        error("IORING_FEAT_FAST_POLL not available in the kernel, quiting...\n");
+        perror("io_uring_register_ring_fd\n");
+        exit(1);
     }
 }
 
