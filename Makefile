@@ -1,4 +1,4 @@
-CC = gcc
+CC = g++
 
 CCFLAGS ?= -Wall -Werror -Wpedantic -Ofast -march=native -D_GNU_SOURCE -luring -std=c++23 -nostdinc++
 all_targets = uring_server server2 sqpoll
