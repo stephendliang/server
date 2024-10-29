@@ -164,6 +164,7 @@ uring_server::~uring_server()
         close(listening_socket_);
     }
 }
+/*
 
 int uring_server::setup_buffers(int group_id)
 {
@@ -179,13 +180,11 @@ int uring_server::setup_buffers(int group_id)
     // buf_ring is the beginning 
     ctx->buf_ring = (struct io_uring_buf_ring *)mapped;
 
-/*
-    struct io_uring_buf_ring *io_uring_setup_buf_ring(struct io_uring *ring,
-                               unsigned int nentries,
-                               int bgid,
-                               unsigned int flags,
-                               int *ret);
-*/
+    //struct io_uring_buf_ring *io_uring_setup_buf_ring(struct io_uring *ring,
+    //                           unsigned int nentries,
+    //                           int bgid,
+    //                           unsigned int flags,
+    //                           int *ret);
     io_uring_buf_ring_init(ctx->buf_ring);
 
     // the BGID here is needed to identify the recvs and sends...
@@ -213,6 +212,7 @@ int uring_server::setup_buffers(int group_id)
 
     return 0;
 }
+*/
 
 static void recycle_buffer(io_uring_buf_ring* br, uint8_t* buf_base_addr, uint16_t idx)
 {
@@ -274,7 +274,7 @@ void uring_server::handle_send(io_uring_cqe* cqe, uint16_t buffer_idx)
         // EBADF - Fd has been closed
         add_close(client_fd);
     } else if (result < 0) {
-        LOG_ERROR("Write error: %d\n", result);
+        printf("Write error: %d\n", result);
     }
 
     recycle_buffer(buf_ring_, io_buffers_base_addr_, buffer_idx);
@@ -294,12 +294,12 @@ void uring_server::handle_accept(io_uring_cqe* cqe, uint16_t buffer_idx)
     if (client_fd >= 0) [[likely]] {
         // Valid fd, start reading
         add_recv(client_fd);
-        LOG_INFO("New connection: %d\n", client_fd);
+        printf("New connection: %d\n", client_fd);
     } else {
-        LOG_ERROR("Accept error: %d\n", client_fd);
+        printf("Accept error: %d\n", client_fd);
     }
 }
-
+/*
 void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
 {
     const auto result = cqe->res;
@@ -330,7 +330,7 @@ void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
 
             recycle_buffer(idx);
 
-            LOG_INFO("Read %d bytes on fd: %d\n", result, client_fd);
+            printf("Read %d bytes on fd: %d\n", result, client_fd);
 
             // Echo the data we just read (DO WE NEED A BUF_GROUP) // sqe->buf_group = gid;
             add_send(client_fd, addr, result, buffer_idx);
@@ -355,8 +355,8 @@ void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
         add_recv(client_fd);
     }
 }
-
-void uring_server::handle_recv2(io_uring_cqe* cqe, int32_t client_fd, uint16_t buffer_idx)
+*/
+void uring_server::handle_recv(io_uring_cqe* cqe, int32_t client_fd, uint16_t buffer_idx)
 {
     const auto result = cqe->res;
     bool closed = false;
@@ -371,9 +371,9 @@ void uring_server::handle_recv2(io_uring_cqe* cqe, int32_t client_fd, uint16_t b
             const uint16_t buffer_idx = cqe->flags >> 16;
             const void* addr = get_buffer_addr(io_buffers_base_addr_, buffer_idx);
 
-            recycle_buffer(idx);
+            //recycle_buffer(buf_ring_, io_buffers_base_addr_, idx);
 
-            LOG_INFO("Read %d bytes on fd: %d\n", result, client_fd);
+            printf("Read %d bytes on fd: %d\n", result, client_fd);
             // Echo the data we just read (DO WE NEED A BUF_GROUP) // sqe->buf_group = gid;
             add_send(client_fd, addr, result, buffer_idx);
         }
@@ -407,7 +407,6 @@ By having two separate buffers as well as different buffer groups, you will not 
 
 void uring_server::evloop()
 {
-    
     //io_uring_cqe* cqes[CQE_BATCH_SIZE];
     unsigned head;
     unsigned count = 0;

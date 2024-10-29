@@ -46,7 +46,7 @@ static void set_context(io_uring_sqe* sqe, ContextType type, int32_t client_fd, 
     &sqe->user_data = user_data_t{client_fd, type, buffer_idx};
 }
 
-struct uring_server
+class uring_server
 {
 /*
     unsigned char *buffer_base;
@@ -93,7 +93,7 @@ public:
 
     int setup_buffers(int group_id);
 
-    void ev_loop();
+    void evloop();
 
     void handle_accept(io_uring_cqe* cqe, uint16_t buffer_idx);
 
