@@ -416,7 +416,7 @@ void uring_server::evloop()
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
     typedef void (uring_server::*handle_func_t)(io_uring_cqe* cqe, int client_fd, uint16_t buffer_idx);
-    handle_func_t hfcs[] = { &uring_server::handle_recv, &uring_server::handle_write, &uring_server::handle_accept };
+    handle_func_t hfcs[] = { &uring_server::handle_recv, &uring_server::handle_send, &uring_server::handle_send, &uring_server::handle_accept };
 #endif
 
     // start event loop
