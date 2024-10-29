@@ -1,6 +1,6 @@
 CC = g++
 
-CCFLAGS ?= -Wall -Werror -Wpedantic -Ofast -march=native -D_GNU_SOURCE -luring -std=c++23 -nostdinc++
+CCFLAGS ?= -Wall -Werror -Wpedantic -Ofast -march=native -D_GNU_SOURCE -luring -std=c++23
 all_targets = uring_server server2 sqpoll
 
 .PHONY: liburing uring_server server2 sqpoll
