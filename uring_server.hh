@@ -37,6 +37,11 @@ struct user_data_t
     int64_t client_fd : 32;
     int64_t type : 16;
     int64_t buffer_idx : 16;
+
+    user_data_t(int64_t client_fd_, URING_OP type_, int64_t buffer_idx_):
+    client_fd(client_fd_),
+    type(type_),
+    buffer_idx(buffer_idx) {}
 };
 
 
@@ -55,6 +60,7 @@ struct user_data_t
 // The number of IO buffers to pre-allocate
 #define NUM_IO_BUFFERS 4096
 
+#define BUFFER_GROUP_ID 1
     
 
 
@@ -115,7 +121,8 @@ public:
         }
 
         if (sqe == nullptr) {
-            error(EXIT_ERROR, 0, "io_uring_get_sqe");
+            perror("io_uring_get_sqe\n");
+            exit(1);
         }
 
         return sqe;

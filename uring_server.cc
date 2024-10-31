@@ -34,7 +34,7 @@ static inline int setup_socket(int port)
         exit(1);
     }
 
-    if (listen(sock_listen_fd, BACKLOG) < 0) {
+    if (listen(sock_listen_fd, SOMAXCONN) < 0) {
         perror("Error listening on socket...\n");
         exit(1);
     }
@@ -46,7 +46,7 @@ static inline void init_io_uring(io_uring* ring, unsigned num_submission_queue_e
 {
     io_uring_params params;
     memset(&params, 0, sizeof(params));
-    params.cq_entries = QD * 8;
+    //params.cq_entries = QD * 8;
     //IORING_SETUP_SINGLE_ISSUER can only be used with single thread
     params.flags = (IORING_SETUP_DEFER_TASKRUN) | (IORING_SETUP_SUBMIT_ALL | IORING_SETUP_COOP_TASKRUN | IORING_SETUP_CQSIZE);
 
@@ -64,7 +64,7 @@ static inline void init_io_uring(io_uring* ring, unsigned num_submission_queue_e
         exit(1);
     }
 
-    if (io_uring_register_ring_fd(&ring) != 1) {
+    if (io_uring_register_ring_fd(ring) != 1) {
         perror("io_uring_register_ring_fd\n");
         exit(1);
     }
@@ -72,15 +72,15 @@ static inline void init_io_uring(io_uring* ring, unsigned num_submission_queue_e
 
 
 static constexpr unsigned buffer_ring_size() {
-    return (UringEchoServer::IO_BUFFER_SIZE + sizeof(io_uring_buf)) * UringEchoServer::NUM_IO_BUFFERS;
+    return (IO_BUFFER_SIZE + sizeof(io_uring_buf)) * NUM_IO_BUFFERS;
 }
 
 static constexpr uint8_t* get_buffer_base_addr(void* ring_addr) {
-    return (uint8_t*)ring_addr + (sizeof(io_uring_buf) * UringEchoServer::NUM_IO_BUFFERS);
+    return (uint8_t*)ring_addr + (sizeof(io_uring_buf) * NUM_IO_BUFFERS);
 }
 
 static constexpr uint8_t* get_buffer_addr(uint8_t* base_addr, uint16_t idx) {
-    return base_addr + (idx << log2<UringEchoServer::IO_BUFFER_SIZE>());
+    return base_addr + (idx << log2<IO_BUFFER_SIZE>());
 }
 
 // Pretty much a copy-paste from:
@@ -243,7 +243,7 @@ static void recycle_buffer(io_uring_buf_ring* br, uint8_t* buf_base_addr, uint16
     //io_uring_buf_ring_add(buf_ring, buf_base_addr + (idx << log2<uring_server::IO_BUFFER_SIZE>()), uring_server::IO_BUFFER_SIZE, idx,
     //                      io_uring_buf_ring_mask(NUM_IO_BUFFERS), /* buf_offset */ 0);
     io_uring_buf_ring_add(br, buf_base_addr + IO_BUFFER_SIZE * i, IO_BUFFER_SIZE, i, io_uring_buf_ring_mask(NUM_IO_BUFFERS), 0);
-//UringEchoServer::IO_BUFFER_SIZE, idx,io_uring_buf_ring_mask(UringEchoServer::NUM_IO_BUFFERS), 
+//IO_BUFFER_SIZE, idx,io_uring_buf_ring_mask(NUM_IO_BUFFERS), 
     // Make the buffer visible to the kernel
     io_uring_buf_ring_advance(br, 1);
 }
@@ -439,7 +439,7 @@ void uring_server::evloop()
         io_uring_for_each_cqe(&ring_, head, cqe) {
             ++count;
 
-            user_data_t ud = cqe->user_data;
+            user_data_t ud = user_data_t(cqe->user_data);
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
             (this->*hfcs[ud.type & 3])(cqe, ud.client_fd, ud.buffer_idx);
