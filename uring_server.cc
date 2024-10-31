@@ -70,6 +70,19 @@ static inline void init_io_uring(io_uring* ring, unsigned num_submission_queue_e
     }
 }
 
+
+static constexpr unsigned buffer_ring_size() {
+    return (UringEchoServer::IO_BUFFER_SIZE + sizeof(io_uring_buf)) * UringEchoServer::NUM_IO_BUFFERS;
+}
+
+static constexpr uint8_t* get_buffer_base_addr(void* ring_addr) {
+    return (uint8_t*)ring_addr + (sizeof(io_uring_buf) * UringEchoServer::NUM_IO_BUFFERS);
+}
+
+static constexpr uint8_t* get_buffer_addr(uint8_t* base_addr, uint16_t idx) {
+    return base_addr + (idx << log2<UringEchoServer::IO_BUFFER_SIZE>());
+}
+
 // Pretty much a copy-paste from:
 // https://github.com/axboe/liburing/blob/master/examples/io_uring-udp.c
 static uint8_t* init_buffer_ring(io_uring* ring, io_uring_buf_ring** buf_ring, size_t ring_size)
@@ -98,19 +111,21 @@ static uint8_t* init_buffer_ring(io_uring* ring, io_uring_buf_ring** buf_ring, s
     // mmap: If addr is nullptr, then the kernel chooses the (page-aligned) address at which to create the
     // mapping
     if (ring_addr == MAP_FAILED) {
-        error(EXIT_ERROR, 0, "mmap ring");
+        perror("mmap ring");
+        exit(-1);
     }
 
     io_uring_buf_reg reg{};
     memset(&reg, 0, sizeof(reg));
     reg.ring_addr = reinterpret_cast<__u64>(ring_addr);
-    reg.ring_entries = uring_server::NUM_IO_BUFFERS;
+    reg.ring_entries = NUM_IO_BUFFERS;
     reg.bgid = BUFFER_GROUP_ID;
 
     const unsigned flags = 0;
     const int register_buf_ring_result = io_uring_register_buf_ring(ring, &reg, flags);
     if (register_buf_ring_result != 0) {
-        error(EXIT_ERROR, -register_buf_ring_result, "io_uring_register_buf_ring");
+        perror("io_uring_register_buf_ring");
+        exit(-register_buf_ring_result);
     }
 
     *buf_ring = reinterpret_cast<io_uring_buf_ring*>(ring_addr);
@@ -120,17 +135,17 @@ static uint8_t* init_buffer_ring(io_uring* ring, io_uring_buf_ring** buf_ring, s
     uint8_t* buffer_base_addr = get_buffer_base_addr(ring_addr);
 
     // Add all buffers to a shared buffer ring
-    for (uint16_t buffer_idx = 0u; buffer_idx < uring_server::NUM_IO_BUFFERS; ++buffer_idx) {
+    for (uint16_t buffer_idx = 0u; buffer_idx < NUM_IO_BUFFERS; ++buffer_idx) {
         // https://man7.org/linux/man-pages/man3/io_uring_buf_ring_add.3.html
         io_uring_buf_ring_add(*buf_ring, get_buffer_addr(buffer_base_addr, /* bid */ buffer_idx),
                               uring_server::IO_BUFFER_SIZE, buffer_idx,
-                              io_uring_buf_ring_mask(uring_server::NUM_IO_BUFFERS),
+                              io_uring_buf_ring_mask(NUM_IO_BUFFERS),
                               /* buf_offset */ buffer_idx);
     }
 
     // Make 'count' new buffers visible to the kernel. Called after io_uring_buf_ring_add() has been called
     // 'count' times to fill in new buffers.
-    io_uring_buf_ring_advance(*buf_ring, uring_server::NUM_IO_BUFFERS);
+    io_uring_buf_ring_advance(*buf_ring, NUM_IO_BUFFERS);
 
     return buffer_base_addr;
 }
@@ -164,7 +179,7 @@ uring_server::~uring_server()
         io_uring_queue_exit(&ring_);
     }
 
-    if (listening_socket_ != ERROR) {
+    if (listening_socket_ != -1) {
         close(listening_socket_);
     }
 }
@@ -226,7 +241,7 @@ static void recycle_buffer(io_uring_buf_ring* br, uint8_t* buf_base_addr, uint16
     // io_uring_buf_ring_cq_advance(3), then buf_offset should be 0
 
     //io_uring_buf_ring_add(buf_ring, buf_base_addr + (idx << log2<uring_server::IO_BUFFER_SIZE>()), uring_server::IO_BUFFER_SIZE, idx,
-    //                      io_uring_buf_ring_mask(uring_server::NUM_IO_BUFFERS), /* buf_offset */ 0);
+    //                      io_uring_buf_ring_mask(NUM_IO_BUFFERS), /* buf_offset */ 0);
     io_uring_buf_ring_add(br, buf_base_addr + IO_BUFFER_SIZE * i, IO_BUFFER_SIZE, i, io_uring_buf_ring_mask(NUM_IO_BUFFERS), 0);
 //UringEchoServer::IO_BUFFER_SIZE, idx,io_uring_buf_ring_mask(UringEchoServer::NUM_IO_BUFFERS), 
     // Make the buffer visible to the kernel
@@ -411,7 +426,7 @@ void uring_server::evloop()
     add_accept();
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
-    typedef void (uring_server::*handle_func_t)(io_uring_cqe* cqe, uint16_t buffer_idx);
+    typedef void (uring_server::*handle_func_t)(io_uring_cqe*, int, uint16_t);
     handle_func_t hfcs[] = { &uring_server::handle_recv, &uring_server::handle_send, &uring_server::handle_send, &uring_server::handle_accept };
 #endif
 
