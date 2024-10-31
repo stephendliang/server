@@ -227,17 +227,12 @@ static void recycle_buffer(io_uring_buf_ring* br, uint8_t* buf_base_addr, uint16
 
     //io_uring_buf_ring_add(buf_ring, buf_base_addr + (idx << log2<uring_server::IO_BUFFER_SIZE>()), uring_server::IO_BUFFER_SIZE, idx,
     //                      io_uring_buf_ring_mask(uring_server::NUM_IO_BUFFERS), /* buf_offset */ 0);
-    io_uring_buf_ring_add(br, buf_base_addr + (1U << BUFSIZE_SHIFT) * i, 1U << BUFSIZE_SHIFT, i, io_uring_buf_ring_mask(NUM_BUFFERS), 0);
-
+    io_uring_buf_ring_add(br, buf_base_addr + IO_BUFFER_SIZE * i, IO_BUFFER_SIZE, i, io_uring_buf_ring_mask(NUM_IO_BUFFERS), 0);
+//UringEchoServer::IO_BUFFER_SIZE, idx,io_uring_buf_ring_mask(UringEchoServer::NUM_IO_BUFFERS), 
     // Make the buffer visible to the kernel
     io_uring_buf_ring_advance(br, 1);
 }
 
-void uring_server::register_file_table()
-{
-
-    return ret;
-}
 
 
 
@@ -266,14 +261,15 @@ void uring_server::register_file_table()
 
 
 
-void uring_server::handle_send(io_uring_cqe* cqe, uint16_t buffer_idx)
+void uring_server::handle_send(io_uring_cqe* cqe, int client_fd_idx, uint16_t buffer_idx)
 {
     const auto result = cqe->res;
+    
     if (result == -EPIPE || result == -EBADF || result == -ECONNRESET) [[unlikely]] {
         // EPIPE - Broken pipe
         // ECONNRESET - Connection reset by peer
         // EBADF - Fd has been closed
-        add_close(client_fd);
+        add_close(client_fd_idx);
     } else if (result < 0) {
         printf("Write error: %d\n", result);
     }
@@ -283,21 +279,21 @@ void uring_server::handle_send(io_uring_cqe* cqe, uint16_t buffer_idx)
 
 /////////
 ///////// client_fd is actually an idx
-void uring_server::handle_accept(io_uring_cqe* cqe, uint16_t buffer_idx)
+void uring_server::handle_accept(io_uring_cqe* cqe, int client_fd_idx, uint16_t placeholder)
 {
-    const auto client_fd = cqe->res;
+    //const auto client_fd = cqe->res;
 
     if (!flag_is_set(cqe, IORING_CQE_F_MORE)) [[unlikely]] {
         // The current accept will not produce any more entries, add a new one
         add_accept();
     }
 
-    if (client_fd >= 0) [[likely]] {
+    if (client_fd_idx >= 0) [[likely]] {
         // Valid fd, start reading
-        add_recv(client_fd);
-        printf("New connection: %d\n", client_fd);
+        add_recv(client_fd_idx);
+        printf("New connection: %d\n", client_fd_idx);
     } else {
-        printf("Accept error: %d\n", client_fd);
+        printf("Accept error: %d\n", client_fd_idx);
     }
 }
 /*
@@ -357,7 +353,7 @@ void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
     }
 }
 */
-void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
+void uring_server::handle_recv(io_uring_cqe* cqe, int client_fd_idx, uint16_t placeholder)
 {
     const auto result = cqe->res;
     bool closed = false;
@@ -366,7 +362,7 @@ void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
         // We read some data. Yay!
         if (!flag_is_set(cqe, IORING_CQE_F_BUFFER)) [[unlikely]] {
             // No buffer flag set, not sure this can happen(?)...
-            add_close(client_fd); // Brute force close for now
+            add_close(client_fd_idx); // Brute force close for now
             closed = true;
         } else {
             const uint16_t buffer_idx = cqe->flags >> 16;
@@ -374,14 +370,14 @@ void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
 
             //recycle_buffer(buf_ring_, io_buffers_base_addr_, idx);
 
-            printf("Read %d bytes on fd: %d\n", result, client_fd);
+            printf("Read %d bytes on fd: %d\n", result, client_fd_idx);
             // Echo the data we just read (DO WE NEED A BUF_GROUP) // sqe->buf_group = gid;
-            add_send(client_fd, addr, result, buffer_idx);
+            add_send(client_fd_idx, addr, result, buffer_idx);
         }
     } else { // Error
         // EOF, Broken pipe or Connection reset by peer
         if ((result != -ENOBUFS) && (result == 0 || result == -EBADF || result == -ECONNRESET)) { [[unlikely]]
-            add_close(client_fd);
+            add_close(client_fd_idx);
             closed = true;
         }
     }
@@ -389,7 +385,7 @@ void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
     // if this is closed, we do not add any more
     if (!closed && !flag_is_set(cqe, IORING_CQE_F_MORE)) [[unlikely]] {
         // The current recv will not produce any more entries, add a new one
-        add_recv(client_fd);
+        add_recv(client_fd_idx);
     }
 }
 
@@ -408,7 +404,7 @@ By having two separate buffers as well as different buffer groups, you will not 
 
 void uring_server::evloop()
 {
-    //io_uring_cqe* cqes[CQE_BATCH_SIZE];
+    io_uring_cqe* cqe;
     unsigned head;
     unsigned count = 0;
 
@@ -435,9 +431,9 @@ void uring_server::evloop()
 
 #elif CQE_HANDLER_STYLE==CQE_HANDLER_IF_CHAIN
             if (ud.type == URING_OP::ACCEPT)
-                handle_accept(cqe);
+                handle_accept(cqe, cqe->res,  -1);
             else if (ud.type == URING_OP::RECV)
-                handle_recv(cqe, ud.client_fd);
+                handle_recv(cqe, ud.client_fd,  -1);
             else if (ud.type == URING_OP::SEND)
                 handle_write(cqe, ud.client_fd, ud.buffer_idx);
 #endif

@@ -46,6 +46,25 @@ static void set_context(io_uring_sqe* sqe, ContextType type, int32_t client_fd, 
     &sqe->user_data = user_data_t{client_fd, type, buffer_idx};
 }
 
+
+// Min number of entries to wait for in the event loop
+#define NUM_WAIT_ENTRIES 1
+
+// The maximum number of entries to retrieve in a single loop iteration
+#define CQE_BATCH_SIZE 256
+
+// The size of the SQ. By default, the CQ ring will be twice this number
+#define NUM_SUBMISSION_QUEUE_ENTRIES 4096
+
+// The size of each pre-allocated IO buffer. Power-of-2.
+#define IO_BUFFER_SIZE 2048
+
+// The number of IO buffers to pre-allocate
+#define NUM_IO_BUFFERS 4096
+
+    
+
+
 class uring_server
 {
 /*
@@ -75,19 +94,6 @@ class uring_server
     socklen_t client_addr_len_ = sizeof(client_addr_);
 
 public:
-    // Min number of entries to wait for in the event loop
-    static constexpr unsigned NUM_WAIT_ENTRIES = 1;
-    // The maximum number of entries to retrieve in a single loop iteration
-    static constexpr unsigned CQE_BATCH_SIZE = 256;
-    // The size of the SQ. By default, the CQ ring will be twice this number
-    static constexpr unsigned NUM_SUBMISSION_QUEUE_ENTRIES = 4096;
-    
-    // The size of each pre-allocated IO buffer. Power-of-2.
-    static constexpr unsigned IO_BUFFER_SIZE = 2048;
-    // The number of IO buffers to pre-allocate
-    static constexpr uint16_t NUM_IO_BUFFERS = 4096;
-
-    
     uring_server();
 
     ~uring_server();
@@ -98,11 +104,11 @@ public:
 
     void evloop();
 
-    void handle_accept(io_uring_cqe* cqe, uint16_t buffer_idx);
+    void handle_accept(io_uring_cqe* cqe, int client_fd_idx, uint16_t placeholder);
 
-    void handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx);
+    void handle_recv(io_uring_cqe* cqe, int client_fd_idx, uint16_t placeholder);
 
-    void handle_send(io_uring_cqe* cqe, uint16_t buffer_idx);
+    void handle_send(io_uring_cqe* cqe, int client_fd_idx, uint16_t buffer_idx);
 
     inline io_uring_sqe* get_sqe()
     {
@@ -130,12 +136,12 @@ public:
         io_uring_prep_multishot_accept_direct(sqe, listening_socket_, client_addr_, client_len_, 0);
     }
 
-    inline void add_close(int client_fd)
+    inline void add_close(int client_fd_idx)
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, set_context(client_fd, URING_OP::CLOSE, 0));
+        io_uring_sqe_set_data64(sqe, set_context(client_fd_idx, URING_OP::CLOSE, 0));
 
-        io_uring_prep_close(sqe, client_fd);
+        io_uring_prep_close(sqe, client_fd_idx);
         io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
     }
 
@@ -150,11 +156,11 @@ public:
         sqe->buf_group = BUFFER_GROUP_ID;
     }
 
-    inline void add_send(int client_fd, const void* data, unsigned length, uint16_t buffer_idx)
+    inline void add_send(int client_fd_idx, const void* data, unsigned length, uint16_t buffer_idx)
     {
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, set_context(client_fd, URING_OP::SEND, buffer_idx));
+        io_uring_sqe_set_data64(sqe, set_context(client_fd_idx, URING_OP::SEND, buffer_idx));
 
-        io_uring_prep_send_zc_fixed(sqe, client_fd, data, length, 0);
+        io_uring_prep_send_zc_fixed(sqe, client_fd_idx, data, length, 0);
     }
 };
