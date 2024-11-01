@@ -42,6 +42,8 @@ union user_data_t
         int64_t buffer_idx : 16;
     } bitfield;
 
+    user_data_t() {}
+
     user_data_t(int32_t c, URING_OP t, int16_t b) {
         bitfield.client_fd = c;
         bitfield.type = int16_t(t);
@@ -106,7 +108,7 @@ class uring_server
     socklen_t client_addr_len_ = sizeof(client_addr_);
 
 public:
-    uring_server();
+    uring_server(uint16_t port);
 
     ~uring_server();
 

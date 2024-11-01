@@ -150,7 +150,7 @@ static uint8_t* init_buffer_ring(io_uring* ring, io_uring_buf_ring** buf_ring, s
 }
 
 
-uring_server::uring_server()
+uring_server::uring_server(uint16_t port)
 {
     listening_socket_ = setup_socket(port);
     init_io_uring(&ring_, NUM_SUBMISSION_QUEUE_ENTRIES);
@@ -162,7 +162,7 @@ uring_server::uring_server()
     io_buffers_base_addr_ = init_buffer_ring(&ring_, &buf_ring_, ring_size);
 
     // register files()
-    if (io_uring_register_files_sparse(ring_, NUM_FILES_REGISTERED) != 0) {
+    if (io_uring_register_files_sparse(&ring_, NUM_FILES_REGISTERED) != 0) {
         perror("io_uring_register_files_sparse");
         exit(-1);
     }
