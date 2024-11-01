@@ -443,6 +443,7 @@ void uring_server::evloop()
     io_uring_cqe* cqe;
     unsigned head;
     unsigned count = 0;
+    user_data_t ud;
 
     add_accept();
 
@@ -460,18 +461,18 @@ void uring_server::evloop()
         io_uring_for_each_cqe(&ring_, head, cqe) {
             ++count;
 
-            user_data_t ud = static_cast<user_data_t>(cqe->user_data);
+            ud.value = cqe->user_data;
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
-            (this->*hfcs[ud.type & 3])(cqe, ud.client_fd, ud.buffer_idx);
+            (this->*hfcs[ud.bitfield.type & 3])(cqe, ud.bitfield.client_fd, ud.bitfield.buffer_idx);
 
 #elif CQE_HANDLER_STYLE==CQE_HANDLER_IF_CHAIN
-            if (ud.type == URING_OP::ACCEPT)
+            if (ud.bitfield.type == URING_OP::ACCEPT)
                 handle_accept(cqe, cqe->res,  -1);
-            else if (ud.type == URING_OP::RECV)
-                handle_recv(cqe, ud.client_fd,  -1);
-            else if (ud.type == URING_OP::SEND)
-                handle_write(cqe, ud.client_fd, ud.buffer_idx);
+            else if (ud.bitfield.type == URING_OP::RECV)
+                handle_recv(cqe, ud.bitfield.client_fd,  -1);
+            else if (ud.bitfield.type == URING_OP::SEND)
+                handle_write(cqe, ud.bitfield.client_fd, ud.bitfield.buffer_idx);
 #endif
         }
 

@@ -32,16 +32,21 @@ enum class output_type : uint8_t
     database
 };
 
-struct user_data_t
+union user_data_t
 {
-    int64_t client_fd : 32;
-    int64_t type : 16;
-    int64_t buffer_idx : 16;
-/*
-    user_data_t(int64_t client_fd_, URING_OP type_, int64_t buffer_idx_):
-    client_fd(client_fd_),
-    type(type_),
-    buffer_idx(buffer_idx) {}*/
+    uint64_t value;
+
+    struct {
+        int64_t client_fd : 32;
+        int64_t type : 16;
+        int64_t buffer_idx : 16;
+    } bitfield;
+
+    user_data_t(int32_t c, URING_OP t, int16_t b) {
+        bitfield.client_fd = c;
+        bitfield.type = int16_t(t);
+        bitfield.buffer_idx = b;
+    }
 };
 
 
@@ -116,9 +121,9 @@ public:
     inline void add_accept()
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t{-1, int(URING_OP::ACCEPT), 0});
+        io_uring_sqe_set_data64(sqe, user_data_t{-1, int(URING_OP::ACCEPT), 0}.v);
 
-        io_uring_prep_multishot_accept_direct(sqe, listening_socket_, client_addr_, client_len_, 0);
+        io_uring_prep_multishot_accept_direct(sqe, listening_socket_, client_addr_, &client_addr_len_, 0);
     }
 
     inline void add_close(int client_fd_idx)
