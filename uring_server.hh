@@ -37,11 +37,11 @@ struct user_data_t
     int64_t client_fd : 32;
     int64_t type : 16;
     int64_t buffer_idx : 16;
-
+/*
     user_data_t(int64_t client_fd_, URING_OP type_, int64_t buffer_idx_):
     client_fd(client_fd_),
     type(type_),
-    buffer_idx(buffer_idx) {}
+    buffer_idx(buffer_idx) {}*/
 };
 
 
@@ -61,6 +61,8 @@ struct user_data_t
 #define NUM_IO_BUFFERS 4096
 
 #define BUFFER_GROUP_ID 1
+
+#define NUM_FILES_REGISTERED 8192
     
 
 
@@ -131,7 +133,7 @@ public:
     inline void add_accept()
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t(-1, URING_OP::ACCEPT, 0));
+        io_uring_sqe_set_data64(sqe, user_data_t{-1, int(URING_OP::ACCEPT), 0});
 
         io_uring_prep_multishot_accept_direct(sqe, listening_socket_, client_addr_, client_len_, 0);
     }
@@ -139,7 +141,7 @@ public:
     inline void add_close(int client_fd_idx)
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t(client_fd_idx, URING_OP::CLOSE, 0));
+        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, int(URING_OP::CLOSE), 0});
 
         io_uring_prep_close(sqe, client_fd_idx);
         io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
@@ -148,7 +150,7 @@ public:
     inline void add_recv(int client_fd_idx)
     {
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t(client_fd_idx, URING_OP::RECV, 0));
+        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, int(URING_OP::RECV), 0});
 
         // len must be 0
         io_uring_prep_recv_multishot(sqe, client_fd_idx, nullptr, 0, 0);
@@ -159,7 +161,7 @@ public:
     inline void add_send(int client_fd_idx, const void* data, unsigned length, uint16_t buffer_idx)
     {
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t(client_fd_idx, URING_OP::SEND, buffer_idx));
+        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, URING_OP::SEND, buffer_idx});
 
         io_uring_prep_send_zc_fixed(sqe, client_fd_idx, data, length, 0);
     }

@@ -13,7 +13,6 @@
 
 static inline int setup_socket(int port)
 {
-    struct sockaddr_in serv_addr;
     int sock_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     
     const int val = 1;
@@ -22,7 +21,7 @@ static inline int setup_socket(int port)
         exit(1);
     }
 
-    struct sockaddr_in addr = {
+    struct sockaddr_in serv_addr = {
         .sin_family = AF_INET,
         .sin_port = htons(port),
         .sin_addr = { INADDR_ANY }
@@ -80,7 +79,7 @@ static constexpr uint8_t* get_buffer_base_addr(void* ring_addr) {
 }
 
 static constexpr uint8_t* get_buffer_addr(uint8_t* base_addr, uint16_t idx) {
-    return base_addr + (idx << log2<IO_BUFFER_SIZE>());
+    return base_addr + (idx * IO_BUFFER_SIZE);
 }
 
 // Pretty much a copy-paste from:
@@ -138,7 +137,7 @@ static uint8_t* init_buffer_ring(io_uring* ring, io_uring_buf_ring** buf_ring, s
     for (uint16_t buffer_idx = 0u; buffer_idx < NUM_IO_BUFFERS; ++buffer_idx) {
         // https://man7.org/linux/man-pages/man3/io_uring_buf_ring_add.3.html
         io_uring_buf_ring_add(*buf_ring, get_buffer_addr(buffer_base_addr, /* bid */ buffer_idx),
-                              uring_server::IO_BUFFER_SIZE, buffer_idx,
+                              IO_BUFFER_SIZE, buffer_idx,
                               io_uring_buf_ring_mask(NUM_IO_BUFFERS),
                               /* buf_offset */ buffer_idx);
     }
@@ -163,10 +162,10 @@ uring_server::uring_server()
     io_buffers_base_addr_ = init_buffer_ring(&ring_, &buf_ring_, ring_size);
 
     // register files()
-    if (io_uring_register_files_sparse(ring, NR_FILES)) {
-
+    if (io_uring_register_files_sparse(ring, NUM_FILES_REGISTERED) != 0) {
+        perror("io_uring_register_files_sparse");
+        exit(-1);
     }
-
 }
 
 uring_server::~uring_server()
@@ -439,7 +438,7 @@ void uring_server::evloop()
         io_uring_for_each_cqe(&ring_, head, cqe) {
             ++count;
 
-            user_data_t ud = user_data_t(cqe->user_data);
+            user_data_t ud = static_cast<user_data_t>(cqe->user_data);
 
 #if CQE_HANDLER_STYLE==CQE_HANDLER_FUNCTION_TABLE
             (this->*hfcs[ud.type & 3])(cqe, ud.client_fd, ud.buffer_idx);
