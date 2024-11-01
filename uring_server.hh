@@ -49,6 +49,12 @@ union user_data_t
     }
 };
 
+inline uint64_t userdata2value(int32_t c, URING_OP t, int16_t b)
+{
+    user_data_t ud(c, t, b);
+    return ud.value;
+}
+
 
 // Min number of entries to wait for in the event loop
 #define NUM_WAIT_ENTRIES 1
@@ -121,15 +127,15 @@ public:
     inline void add_accept()
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t{-1, int(URING_OP::ACCEPT), 0}.value);
+        io_uring_sqe_set_data64(sqe, userdata2value(-1, URING_OP::ACCEPT, 0));
 
-        io_uring_prep_multishot_accept_direct(sqe, listening_socket_, client_addr_, &client_addr_len_, 0);
+        io_uring_prep_multishot_accept_direct(sqe, listening_socket_, (sockaddr*)client_addr_, &client_addr_len_, 0);
     }
 
     inline void add_close(int client_fd_idx)
     {
         io_uring_sqe *sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, int(URING_OP::CLOSE), 0}.value);
+        io_uring_sqe_set_data64(sqe, userdata2value(client_fd_idx, URING_OP::CLOSE, 0));
 
         io_uring_prep_close(sqe, client_fd_idx);
         io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
@@ -138,7 +144,7 @@ public:
     inline void add_recv(int client_fd_idx)
     {
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, int(URING_OP::RECV), 0}.value);
+        io_uring_sqe_set_data64(sqe, userdata2value(client_fd_idx, URING_OP::RECV, 0));
 
         // len must be 0
         io_uring_prep_recv_multishot(sqe, client_fd_idx, nullptr, 0, 0);
@@ -165,7 +171,7 @@ public:
                                         unsigned buf_index);
         */
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, int(URING_OP::SEND), buffer_idx}.value);
+        io_uring_sqe_set_data64(sqe, userdata2value(client_fd_idx, URING_OP::SEND, buffer_idx));
 
         io_uring_prep_send_zc_fixed(sqe, client_fd_idx, data, length, 0);
     }
