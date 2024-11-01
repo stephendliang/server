@@ -162,7 +162,7 @@ uring_server::uring_server()
     io_buffers_base_addr_ = init_buffer_ring(&ring_, &buf_ring_, ring_size);
 
     // register files()
-    if (io_uring_register_files_sparse(ring, NUM_FILES_REGISTERED) != 0) {
+    if (io_uring_register_files_sparse(ring_, NUM_FILES_REGISTERED) != 0) {
         perror("io_uring_register_files_sparse");
         exit(-1);
     }
@@ -182,6 +182,28 @@ uring_server::~uring_server()
         close(listening_socket_);
     }
 }
+
+
+io_uring_sqe* uring_server::get_sqe()
+{
+    // returns a pointer to the next submission queue event on success and NULL on failure.
+    // If NULL is returned, the SQ ring is currently full and entries must be submitted for processing before
+    // new ones can get allocated
+    io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+    if (sqe == nullptr) [[unlikely]] {
+        io_uring_submit(&ring_);
+        sqe = io_uring_get_sqe(&ring_);
+    }
+
+    if (sqe == nullptr) [[unlikely]] {
+        perror("io_uring_get_sqe\n");
+        exit(1);
+    }
+
+    return sqe;
+}
+
+
 /*
 
 int uring_server::setup_buffers(int group_id)
@@ -241,7 +263,7 @@ static void recycle_buffer(io_uring_buf_ring* br, uint8_t* buf_base_addr, uint16
 
     //io_uring_buf_ring_add(buf_ring, buf_base_addr + (idx << log2<uring_server::IO_BUFFER_SIZE>()), uring_server::IO_BUFFER_SIZE, idx,
     //                      io_uring_buf_ring_mask(NUM_IO_BUFFERS), /* buf_offset */ 0);
-    io_uring_buf_ring_add(br, buf_base_addr + IO_BUFFER_SIZE * i, IO_BUFFER_SIZE, i, io_uring_buf_ring_mask(NUM_IO_BUFFERS), 0);
+    io_uring_buf_ring_add(br, get_buffer_addr(buf_base_addr, idx), IO_BUFFER_SIZE, idx, io_uring_buf_ring_mask(NUM_IO_BUFFERS), 0);
 //IO_BUFFER_SIZE, idx,io_uring_buf_ring_mask(NUM_IO_BUFFERS), 
     // Make the buffer visible to the kernel
     io_uring_buf_ring_advance(br, 1);

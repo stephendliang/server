@@ -111,24 +111,7 @@ public:
 
     void handle_send(io_uring_cqe* cqe, int client_fd_idx, uint16_t buffer_idx);
 
-    inline io_uring_sqe* get_sqe()
-    {
-        // returns a pointer to the next submission queue event on success and NULL on failure.
-        // If NULL is returned, the SQ ring is currently full and entries must be submitted for processing before
-        // new ones can get allocated
-        io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
-        if (sqe == nullptr) {
-            io_uring_submit(&ring_);
-            sqe = io_uring_get_sqe(&ring_);
-        }
-
-        if (sqe == nullptr) {
-            perror("io_uring_get_sqe\n");
-            exit(1);
-        }
-
-        return sqe;
-    }
+    io_uring_sqe* get_sqe();
 
     inline void add_accept()
     {
@@ -160,8 +143,24 @@ public:
 
     inline void add_send(int client_fd_idx, const void* data, unsigned length, uint16_t buffer_idx)
     {
+        /*
+       void io_uring_prep_send_zc(struct io_uring_sqe *sqe,
+                                  int sockfd,
+                                  const void *buf,
+                                  size_t len,
+                                  int flags,
+                                  unsigned zc_flags);
+
+       void io_uring_prep_send_zc_fixed(struct io_uring_sqe *sqe,
+                                        int sockfd,
+                                        const void *buf,
+                                        size_t len,
+                                        int flags,
+                                        unsigned zc_flags);
+                                        unsigned buf_index);
+        */
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, URING_OP::SEND, buffer_idx});
+        io_uring_sqe_set_data64(sqe, user_data_t{client_fd_idx, int(URING_OP::SEND), buffer_idx});
 
         io_uring_prep_send_zc_fixed(sqe, client_fd_idx, data, length, 0);
     }
