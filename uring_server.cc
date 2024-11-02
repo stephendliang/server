@@ -165,10 +165,10 @@ uring_server::uring_server(uint16_t port)
     io_buffers_base_addr_ = init_buffer_ring(&ring_, &buf_ring_, ring_size);
 
     // register files()
-    if (io_uring_register_files_sparse(&ring_, NUM_FILES_REGISTERED) != 0) {
-        perror("io_uring_register_files_sparse");
-        exit(-1);
-    }
+    //if (io_uring_register_files_sparse(&ring_, NUM_FILES_REGISTERED) != 0) {
+    //    perror("io_uring_register_files_sparse");
+    //    exit(-1);
+    //}
 }
 
 uring_server::~uring_server()
@@ -411,7 +411,7 @@ void uring_server::handle_recv(io_uring_cqe* cqe, int client_fd_idx, uint16_t pl
 
             printf("Read %d bytes on fd: %d\n", result, client_fd_idx);
 
-            
+
             // Echo the data we just read (DO WE NEED A BUF_GROUP) // sqe->buf_group = gid;
             add_send(client_fd_idx, addr, result, buffer_idx);
         }

@@ -150,7 +150,7 @@ public:
         sqe->buf_group = BUFFER_GROUP_ID;
     }
 
-    inline void add_send(int client_fd_idx, const void* data, unsigned length, uint16_t buffer_idx)
+    inline void add_send(int client_fd, const void* data, unsigned length, uint16_t buffer_idx)
     {
         /*
        void io_uring_prep_send_zc(struct io_uring_sqe *sqe,
