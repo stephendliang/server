@@ -70,15 +70,18 @@ static inline void init_io_uring(io_uring* ring, unsigned num_submission_queue_e
 }
 
 
-static constexpr unsigned buffer_ring_size() {
+static constexpr unsigned buffer_ring_size()
+{
     return (IO_BUFFER_SIZE + sizeof(io_uring_buf)) * NUM_IO_BUFFERS;
 }
 
-static constexpr uint8_t* get_buffer_base_addr(void* ring_addr) {
+static constexpr uint8_t* get_buffer_base_addr(void* ring_addr)
+{
     return (uint8_t*)ring_addr + (sizeof(io_uring_buf) * NUM_IO_BUFFERS);
 }
 
-static constexpr uint8_t* get_buffer_addr(uint8_t* base_addr, uint16_t idx) {
+static constexpr uint8_t* get_buffer_addr(uint8_t* base_addr, uint16_t idx)
+{
     return base_addr + (idx * IO_BUFFER_SIZE);
 }
 
@@ -407,6 +410,8 @@ void uring_server::handle_recv(io_uring_cqe* cqe, int client_fd_idx, uint16_t pl
             //recycle_buffer(buf_ring_, io_buffers_base_addr_, idx);
 
             printf("Read %d bytes on fd: %d\n", result, client_fd_idx);
+
+            
             // Echo the data we just read (DO WE NEED A BUF_GROUP) // sqe->buf_group = gid;
             add_send(client_fd_idx, addr, result, buffer_idx);
         }
@@ -441,7 +446,7 @@ By having two separate buffers as well as different buffer groups, you will not 
 void uring_server::evloop()
 {
     io_uring_cqe* cqe;
-    unsigned head;
+    unsigned head = 0;
     unsigned count = 0;
     user_data_t ud;
 

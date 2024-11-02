@@ -15,6 +15,14 @@
 
 #define CQE_HANDLER_STYLE CQE_HANDLER_FUNCTION_TABLE
 
+
+
+#define USE_ZEROCOPY 0
+
+#define USE_REGISTERED_FD
+
+
+
 #define flag_is_set(cqe, flag) (cqe->flags & flag)
 
 enum class URING_OP : uint8_t
@@ -42,9 +50,9 @@ union user_data_t
         int64_t buffer_idx : 16;
     } bitfield;
 
-    user_data_t() {}
+    inline user_data_t() {}
 
-    user_data_t(int32_t c, URING_OP t, int16_t b) {
+    inline user_data_t(int32_t c, URING_OP t, int16_t b) {
         bitfield.client_fd = c;
         bitfield.type = int16_t(t);
         bitfield.buffer_idx = b;
@@ -76,23 +84,11 @@ inline uint64_t userdata2value(int32_t c, URING_OP t, int16_t b)
 #define BUFFER_GROUP_ID 1
 
 #define NUM_FILES_REGISTERED 8192
-    
+
 
 
 class uring_server
 {
-/*
-    unsigned char *buffer_base;
-    struct msghdr msg;
-    int buf_shift;
-    int af;
-    bool verbose;
-    struct sendmsg_ctx send[BUFFERS];
-    size_t buf_ring_size;
-
-
-*/
-
     int listening_socket_ = -1;
     io_uring ring_;
     io_uring_buf_ring* buf_ring_;
@@ -171,10 +167,20 @@ public:
                                         int flags,
                                         unsigned zc_flags);
                                         unsigned buf_index);
+
+
+       void io_uring_prep_send(struct io_uring_sqe *sqe,
+                               int sockfd,
+                               const void *buf,
+                               size_t len,
+                               int flags);
         */
         io_uring_sqe* sqe = get_sqe();
         io_uring_sqe_set_data64(sqe, userdata2value(client_fd_idx, URING_OP::SEND, buffer_idx));
 
-        io_uring_prep_send_zc_fixed(sqe, client_fd_idx, data, length, 0);
+        io_uring_prep_send(sqe, client_fd, data, length, 0);
+#if USE_ZEROCOPY
+        //io_uring_prep_send_zc_fixed(sqe, client_fd_idx, data, length, 0);
+#endif
     }
 };
