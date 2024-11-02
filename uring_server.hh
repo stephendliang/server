@@ -176,7 +176,7 @@ public:
                                int flags);
         */
         io_uring_sqe* sqe = get_sqe();
-        io_uring_sqe_set_data64(sqe, userdata2value(client_fd_idx, URING_OP::SEND, buffer_idx));
+        io_uring_sqe_set_data64(sqe, userdata2value(client_fd, URING_OP::SEND, buffer_idx));
 
         io_uring_prep_send(sqe, client_fd, data, length, 0);
 #if USE_ZEROCOPY
