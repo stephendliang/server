@@ -486,12 +486,10 @@ void uring_server::evloop()
     }
 }
 
-/*
 int main()
 {
-    server srv;
-    srv.setup();
+    uring_server srv(8095);
     srv.evloop();
-}
 
-*/
+    return 0;
+}
