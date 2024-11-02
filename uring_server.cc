@@ -335,63 +335,7 @@ void uring_server::handle_accept(io_uring_cqe* cqe, int client_fd_idx, uint16_t 
         printf("Accept error: %d\n", client_fd_idx);
     }
 }
-/*
-void uring_server::handle_recv(io_uring_cqe* cqe, uint16_t buffer_idx)
-{
-    const auto result = cqe->res;
-    bool closed = false;
 
-    if (result > 0) [[likely]] {
-        // We read some data. Yay!
-        if (!flag_is_set(cqe, IORING_CQE_F_BUFFER)) [[unlikely]] {
-            // No buffer flag set, not sure this can happen(?)...
-            add_close(client_fd); // Brute force close for now
-            closed = true;
-        } else {
-            const uint16_t buffer_idx = cqe->flags >> 16;
-            const void* addr = get_buffer_addr(io_buffers_base_addr_, buffer_idx);
-
-            {
-                // if the message is truncated
-                // deal with by issuing coalesce
-                // possibly if this file is giant, 
-                // then do not save to memory but rather to file
-                if (o->flags & MSG_TRUNC) {
-                    uint32_t r = io_uring_recvmsg_payload_length(o, cqe->res, &ctx->msg);
-                    fprintf(stderr, "truncated msg need %u received %u\n", o->payloadlen, r);
-                    recycle_buffer(idx);
-                    return 0;
-                }
-            }
-
-            recycle_buffer(idx);
-
-            printf("Read %d bytes on fd: %d\n", result, client_fd);
-
-            // Echo the data we just read (DO WE NEED A BUF_GROUP) // sqe->buf_group = gid;
-            add_send(client_fd, addr, result, buffer_idx);
-        }
-    } else { // Error
-        // EOF, Broken pipe or Connection reset by peer
-        if (result == 0 || result == -EBADF || result == -ECONNRESET) { [[unlikely]]
-            add_close(client_fd);
-            closed = true;
-        }
-
-        // ENOBUFS means nowhere to read it to
-        if (result != -ENOBUFS) {
-            add_close(client_fd); // Brute force close for now
-            closed = true;
-        }
-    }
-
-    // if this is closed, we do not add any more
-    if (!closed && !flag_is_set(cqe, IORING_CQE_F_MORE)) [[unlikely]] {
-        // The current recv will not produce any more entries, add a new one
-        add_recv(client_fd);
-    }
-}
-*/
 void uring_server::handle_recv(io_uring_cqe* cqe, int client_fd_idx, uint16_t placeholder)
 {
     const auto result = cqe->res;
@@ -410,7 +354,6 @@ void uring_server::handle_recv(io_uring_cqe* cqe, int client_fd_idx, uint16_t pl
             //recycle_buffer(buf_ring_, io_buffers_base_addr_, idx);
 
             printf("Read %d bytes on fd: %d\n", result, client_fd_idx);
-
 
             // Echo the data we just read (DO WE NEED A BUF_GROUP) // sqe->buf_group = gid;
             add_send(client_fd_idx, addr, result, buffer_idx);
@@ -488,8 +431,11 @@ void uring_server::evloop()
 
 int main()
 {
-    uring_server srv(8095);
-    srv.evloop();
+
+    printf("%zu\n", sizeof(io_uring));
+
+    //uring_server srv(8095);
+    //srv.evloop();
 
     return 0;
 }
