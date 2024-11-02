@@ -131,7 +131,7 @@ public:
         io_uring_sqe *sqe = get_sqe();
         io_uring_sqe_set_data64(sqe, userdata2value(-1, URING_OP::ACCEPT, 0));
 
-        io_uring_prep_multishot_accept_direct(sqe, listening_socket_, (sockaddr*)client_addr_, &client_addr_len_, 0);
+        io_uring_prep_multishot_accept_direct(sqe, listening_socket_, (sockaddr*)&client_addr_, &client_addr_len_, 0);
     }
 
     inline void add_close(int client_fd_idx)
